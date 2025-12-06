@@ -163,6 +163,8 @@
         ctx.lineTo(w, y);
         ctx.stroke();
       });
+
+      requestAnimationFrame(resizeAndDraw);
     }
     
     window.addEventListener('resize', resizeAndDraw);
@@ -170,6 +172,7 @@
   </script>
 </body>
 </html>
+
 
 
 
