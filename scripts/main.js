@@ -11,14 +11,12 @@ const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
 
 
-(
-  {
-    "landscape-primary": pointers[e.pointerId].pos.y,
-    "landscape-secondary": pointers[e.pointerId].pos.y,
-    "portrait-secondary": pointers[e.pointerId].pos.x,
-    "portrait-primary": pointers[e.pointerId].pos.x
-  }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
-);
+// {
+//   "landscape-primary": pointers[e.pointerId].pos.y,
+//   "landscape-secondary": pointers[e.pointerId].pos.y,
+//   "portrait-secondary": pointers[e.pointerId].pos.x,
+//   "portrait-primary": pointers[e.pointerId].pos.x
+// }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
 
 const audioCtx = new AudioContext();
 addEventListener("pointerdown", () => {
@@ -72,4 +70,5 @@ const pointers = {}; {
       y: e.pageY / document.documentElement.scrollHeight
     }
   }
+
 }
