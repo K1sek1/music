@@ -34,7 +34,7 @@
     // }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
     
     const audioCtx = new AudioContext();
-    addEventListener("pointerdown", () => {
+    addEventListener("pointerup", () => {
       document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
         /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
       });
@@ -93,4 +93,5 @@
   </script>
 </body>
 </html>
+
 
