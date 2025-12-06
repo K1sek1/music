@@ -153,6 +153,16 @@
         ctx.lineTo(w, y);
         ctx.stroke();
       });
+
+      ctx.strokeStyle = 'red';
+      ctx.lineWidth = 1;
+      Object.values(pointers).forEach(pointer => {
+        const y = pointer.pos.y * h;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      });
     }
     
     window.addEventListener('resize', resizeAndDraw);
@@ -160,6 +170,7 @@
   </script>
 </body>
 </html>
+
 
 
 
