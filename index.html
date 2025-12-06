@@ -95,6 +95,17 @@
 
 
 
+    // canvas 要素を生成
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    
+    // スタイル設定（画面いっぱい）
+    Object.assign(canvas.style, {
+      width: '100vw',
+      height: '100vh',
+      display: 'block'
+    });
+    
     const ctx = canvas.getContext('2d');
     
     function resizeAndDraw() {
@@ -145,6 +156,7 @@
   </script>
 </body>
 </html>
+
 
 
 
