@@ -54,6 +54,7 @@
               gain: audioCtx.createGain()
             }
           };
+          pointers[e.pointerId].audio.osc.type = "square";
           pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
           pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
           pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
@@ -93,5 +94,6 @@
   </script>
 </body>
 </html>
+
 
 
