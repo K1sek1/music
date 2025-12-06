@@ -11,6 +11,7 @@ const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
 
 
+
 // {
 //   "landscape-primary": pointers[e.pointerId].pos.y,
 //   "landscape-secondary": pointers[e.pointerId].pos.y,
@@ -27,6 +28,7 @@ addEventListener("pointerdown", () => {
 /** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
 const pointers = {}; {
   addEventListener("pointerdown", e => {
+    console.log("down");
     if (e.button === 0) {
       pointers[e.pointerId] = {
         pos: {
@@ -45,6 +47,7 @@ const pointers = {}; {
     }
   });
   addEventListener("pointermove", e => {
+    console.log("move");
     if (pointers[e.pointerId]) {
       pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
       pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
@@ -53,12 +56,14 @@ const pointers = {}; {
     }
   });
   addEventListener("pointerup", e => {
+    console.log("up");
     if (e.button === 0) {
       pointers[e.pointerId].audio.osc.stop();
       delete pointers[e.pointerId];
     }
   });
   addEventListener("pointercancel", e => {
+    console.log("cancel");
     if (e.button === 0) {
       pointers[e.pointerId].audio.osc.stop();
       delete pointers[e.pointerId];
@@ -70,5 +75,4 @@ const pointers = {}; {
       y: e.pageY / document.documentElement.scrollHeight
     }
   }
-
 }
