@@ -1,0 +1,75 @@
+/** Hz */
+const STANDARD_PITCH = 440;
+
+const SEMITONE = 2 ** (1 / 12);
+
+
+
+const LOWER_LIMIT = STANDARD_PITCH * SEMITONE ** -15;
+const RANGE = 24;
+const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
+
+
+
+(
+  {
+    "landscape-primary": pointers[e.pointerId].pos.y,
+    "landscape-secondary": pointers[e.pointerId].pos.y,
+    "portrait-secondary": pointers[e.pointerId].pos.x,
+    "portrait-primary": pointers[e.pointerId].pos.x
+  }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
+);
+
+const audioCtx = new AudioContext();
+addEventListener("pointerdown", () => {
+  document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
+    /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
+  });
+}, { once: true });
+/** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
+const pointers = {}; {
+  addEventListener("pointerdown", e => {
+    if (e.button === 0) {
+      pointers[e.pointerId] = {
+        pos: {
+          x: e.pageX / document.documentElement.scrollWidth,
+          y: e.pageY / document.documentElement.scrollHeight
+        },
+        audio: {
+          osc: audioCtx.createOscillator(),
+          gain: audioCtx.createGain()
+        }
+      };
+      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
+      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
+      pointers[e.pointerId].audio.osc.start();
+    }
+  });
+  addEventListener("pointermove", e => {
+    if (pointers[e.pointerId]) {
+      pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
+      pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
+      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
+      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+    }
+  });
+  addEventListener("pointerup", e => {
+    if (e.button === 0) {
+      pointers[e.pointerId].audio.osc.stop();
+      delete pointers[e.pointerId];
+    }
+  });
+  addEventListener("pointercancel", e => {
+    if (e.button === 0) {
+      pointers[e.pointerId].audio.osc.stop();
+      delete pointers[e.pointerId];
+    }
+  });
+  function pointerPos(e) {
+    return {
+      x: e.pageX / document.documentElement.scrollWidth,
+      y: e.pageY / document.documentElement.scrollHeight
+    }
+  }
+}
