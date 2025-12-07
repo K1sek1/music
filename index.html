@@ -17,161 +17,163 @@
 </head>
 <body>
   <script defer>
-    /** Hz */
-    const STANDARD_PITCH = 440;
-    
-    const SEMITONE = 2 ** (1 / 12);
-    
-    
-    
-    const LOWER_LIMIT = STANDARD_PITCH * SEMITONE ** -15;
-    const RANGE = 24;
-    const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
-    
-    
-    
-    
-    // {
-    //   "landscape-primary": pointers[e.pointerId].pos.y,
-    //   "landscape-secondary": pointers[e.pointerId].pos.y,
-    //   "portrait-secondary": pointers[e.pointerId].pos.x,
-    //   "portrait-primary": pointers[e.pointerId].pos.x
-    // }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
-    
-    const audioCtx = new AudioContext();
-    addEventListener("pointerup", () => {
-      document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
-        /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
-      });
-    }, { once: true });
-    /** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
-    const pointers = {}; {
-      addEventListener("pointerdown", e => {
-        console.log("down");
-        if (e.button === 0) {
-          pointers[e.pointerId] = {
-            pos: {
-              x: e.pageX / document.documentElement.scrollWidth,
-              y: e.pageY / document.documentElement.scrollHeight
-            },
-            audio: {
-              osc: audioCtx.createOscillator(),
-              gain: audioCtx.createGain()
-            }
-          };
-          pointers[e.pointerId].audio.osc.type = "square";
-          pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-          pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
-          pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
-          pointers[e.pointerId].audio.osc.start();
-        }
-      });
-      addEventListener("pointermove", e => {
-        console.log("move");
-        if (pointers[e.pointerId]) {
-          pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
-          pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
-          pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-          pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
-        }
-      });
-      addEventListener("pointerup", e => {
-        console.log("up");
-        if (e.button === 0) {
-          pointers[e.pointerId].audio.osc.stop();
-          delete pointers[e.pointerId];
-        }
-      });
-      addEventListener("pointercancel", e => {
-        console.log("cancel");
-        if (e.button === 0) {
-          pointers[e.pointerId].audio.osc.stop();
-          delete pointers[e.pointerId];
-        }
-      });
-      function pointerPos(e) {
-        return {
+/** Hz */
+const STANDARD_PITCH = 440;
+
+const SEMITONE = 2 ** (1 / 12);
+
+
+
+const LOWER_LIMIT = STANDARD_PITCH * SEMITONE ** -15;
+const RANGE = 24;
+const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
+
+
+
+
+// {
+//   "landscape-primary": pointers[e.pointerId].pos.y,
+//   "landscape-secondary": pointers[e.pointerId].pos.y,
+//   "portrait-secondary": pointers[e.pointerId].pos.x,
+//   "portrait-primary": pointers[e.pointerId].pos.x
+// }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
+
+const audioCtx = new AudioContext();
+addEventListener("pointerup", () => {
+  document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
+    /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
+  });
+}, { once: true });
+/** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
+const pointers = {}; {
+  addEventListener("pointerdown", e => {
+    // console.log("down");
+    if (e.button === 0) {
+      pointers[e.pointerId] = {
+        pos: {
           x: e.pageX / document.documentElement.scrollWidth,
           y: e.pageY / document.documentElement.scrollHeight
+        },
+        audio: {
+          osc: audioCtx.createOscillator(),
+          gain: audioCtx.createGain()
         }
-      }
+      };
+      pointers[e.pointerId].audio.osc.type = "square";
+      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
+      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
+      pointers[e.pointerId].audio.osc.start();
+      console.log(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE));
     }
-
-
-
-    // canvas 要素を生成
-    const canvas = document.createElement('canvas');
-    document.body.appendChild(canvas);
-    
-    // スタイル設定（画面いっぱい）
-    Object.assign(canvas.style, {
-      width: '100vw',
-      height: '100vh',
-      display: 'block'
-    });
-    
-    const ctx = canvas.getContext('2d');
-    
-    function resizeAndDraw() {
-      // スクロールバーを含まない実際の表示領域サイズを取得
-      const w = document.body.scrollWidth;
-      const h = document.body.scrollHeight;
-    
-      canvas.width = w;
-      canvas.height = h;
-    
-      // 背景を黒で塗りつぶす
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, w, h);
-    
-      // 仮想座標系: 上=0, 下=24
-      const maxY = 24;
-    
-      // 太線の位置
-      const thickLines = [3, 6, 15, 18];
-      // 細線の位置
-      const thinLines = [1, 5, 8, 10, 11, 13, 17, 20, 22, 23];
-    
-      // 太線を描画
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 2;
-      thickLines.forEach(pos => {
-        const y = (pos / maxY) * h;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      });
-    
-      // 細線を描画
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 1;
-      thinLines.forEach(pos => {
-        const y = (pos / maxY) * h;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      });
-
-      ctx.strokeStyle = 'red';
-      ctx.lineWidth = 1;
-      Object.values(pointers).forEach(pointer => {
-        const y = pointer.pos.y * h;
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      });
-
-      requestAnimationFrame(resizeAndDraw);
+  });
+  addEventListener("pointermove", e => {
+    // console.log("move");
+    if (pointers[e.pointerId]) {
+      pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
+      pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
+      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
+      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
     }
-    
-    window.addEventListener('resize', resizeAndDraw);
-    resizeAndDraw();
+  });
+  addEventListener("pointerup", e => {
+    // console.log("up");
+    if (e.button === 0) {
+      pointers[e.pointerId].audio.osc.stop();
+      delete pointers[e.pointerId];
+    }
+  });
+  addEventListener("pointercancel", e => {
+    // console.log("cancel");
+    if (e.button === 0) {
+      pointers[e.pointerId].audio.osc.stop();
+      delete pointers[e.pointerId];
+    }
+  });
+  function pointerPos(e) {
+    return {
+      x: e.pageX / document.documentElement.scrollWidth,
+      y: e.pageY / document.documentElement.scrollHeight
+    }
+  }
+}
+
+
+
+// canvas 要素を生成
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+
+// スタイル設定（画面いっぱい）
+Object.assign(canvas.style, {
+  width: '100vw',
+  height: '100vh',
+  display: 'block'
+});
+
+const ctx = canvas.getContext('2d');
+
+function resizeAndDraw() {
+  // スクロールバーを含まない実際の表示領域サイズを取得
+  const w = document.body.scrollWidth;
+  const h = document.body.scrollHeight;
+
+  canvas.width = w;
+  canvas.height = h;
+
+  // 背景を黒で塗りつぶす
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, w, h);
+
+  // 仮想座標系: 上=0, 下=24
+  const maxY = 24;
+
+  // 太線の位置
+  const thickLines = [3, 6, 15, 18];
+  // 細線の位置
+  const thinLines = [1, 5, 8, 10, 11, 13, 17, 20, 22, 23];
+
+  // 太線を描画
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
+  thickLines.forEach(pos => {
+    const y = (pos / maxY) * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+
+  // 細線を描画
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1;
+  thinLines.forEach(pos => {
+    const y = (pos / maxY) * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 1;
+  Object.values(pointers).forEach(pointer => {
+    const y = pointer.pos.y * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+
+  requestAnimationFrame(resizeAndDraw);
+}
+
+addEventListener('resize', resizeAndDraw);
+resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
