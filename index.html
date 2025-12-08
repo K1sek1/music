@@ -106,8 +106,9 @@ const pointers = {}; {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
       pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
       pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
       redraw()
     }
