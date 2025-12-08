@@ -79,8 +79,8 @@ const pointers = {}; {
   function pointerEnd(e) {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 0.1);
+      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 1);
       delete pointers[e.pointerId];
     }
   }
@@ -200,6 +200,7 @@ resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
