@@ -28,7 +28,7 @@ const LOWER_LIMIT = -15;
 const RANGE = 24;
 // const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
-const fadeDuration = 1 / 60;
+const fadeDuration = 1 / 120;
 
 
 
@@ -108,7 +108,7 @@ const pointers = {}; {
       pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
       pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
       pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
       redraw()
     }
@@ -226,3 +226,4 @@ redraw();
   </script>
 </body>
 </html>
+
