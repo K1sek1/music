@@ -39,6 +39,28 @@ const RANGE = 24;
 // }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
 
 const audioCtx = new AudioContext();
+
+
+
+// 倍音数
+const harmonics = 512;
+
+const real = new Float32Array(harmonics);
+const imag = new Float32Array(harmonics);
+
+// real[0] = 0, imag[0] = 0;
+
+// 1/fスペクトルを近似
+for (let i = 1; i < harmonics; i++) {
+  imag[i] = 1 / i; // 振幅を i に反比例
+  real[i] = 1 / i;     // 位相ゼロ
+}
+
+// PeriodicWaveを生成
+const wave = audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+
+
+
 addEventListener("pointerup", () => {
   document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
     /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
@@ -56,6 +78,7 @@ const pointers = {}; {
           gain: audioCtx.createGain()
         }
       };
+      pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
       // pointers[e.pointerId].audio.osc.type = "square";
       setAudio(e, true);
       pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
@@ -192,6 +215,7 @@ resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
