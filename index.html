@@ -53,7 +53,7 @@ const imag = new Float32Array(harmonics);
 // 1/fスペクトルを近似
 for (let i = 1; i < harmonics; i++) {
   imag[i] = 1 / i; // 振幅を i に反比例
-  real[i] = 1 / i;     // 位相ゼロ
+  real[i] = 0;     // 位相ゼロ
 }
 
 // PeriodicWaveを生成
