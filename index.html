@@ -81,6 +81,7 @@ const pointers = {}; {
       };
       pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
       // pointers[e.pointerId].audio.osc.type = "square";
+      pointers[e.pointerId].audio.gain.gain.value = 0;
       setAudio(e, true);
       pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
       pointers[e.pointerId].audio.osc.start();
@@ -144,7 +145,7 @@ const pointers = {}; {
     pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
     pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
       pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x),
-      audioCtx.currentTime + (isInit ? 0 : fadeDuration)
+      audioCtx.currentTime + fadeDuration
     );
     // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
@@ -226,4 +227,3 @@ redraw();
   </script>
 </body>
 </html>
-
