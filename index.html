@@ -24,9 +24,9 @@ const SEMITONE = 2 ** (1 / 12);
 
 
 
-const LOWER_LIMIT = STANDARD_PITCH * SEMITONE ** -15;
+const LOWER_LIMIT = -15;
 const RANGE = 24;
-const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
+// const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
 
 
@@ -50,51 +50,63 @@ const pointers = {}; {
     // console.log("down");
     if (e.button === 0) {
       pointers[e.pointerId] = {
-        pos: {
-          x: e.pageX / document.documentElement.scrollWidth,
-          y: e.pageY / document.documentElement.scrollHeight
-        },
+        pos: pointerPos(e),
         audio: {
           osc: audioCtx.createOscillator(),
           gain: audioCtx.createGain()
         }
       };
       pointers[e.pointerId].audio.osc.type = "square";
-      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      setAudio(e);
       pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
       pointers[e.pointerId].audio.osc.start();
-      console.log(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE));
+      // console.log(
+      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
+      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE) * 100) / 100 - Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE))
+      // );
     }
   });
   addEventListener("pointermove", e => {
     // console.log("move");
     if (pointers[e.pointerId]) {
-      pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
-      pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
-      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      pointers[e.pointerId].pos = pointerPos(e);
+      setAudio(e);
     }
   });
-  addEventListener("pointerup", e => {
-    // console.log("up");
+  addEventListener("pointerup", pointerEnd);
+  addEventListener("pointercancel", pointerEnd);
+  /** @param {PointerEvent} e */
+  function pointerEnd(e) {
+    // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.osc.stop();
+      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.01);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 0.01);
       delete pointers[e.pointerId];
     }
-  });
-  addEventListener("pointercancel", e => {
-    // console.log("cancel");
-    if (e.button === 0) {
-      pointers[e.pointerId].audio.osc.stop();
-      delete pointers[e.pointerId];
-    }
-  });
+  }
+  /** @param {PointerEvent} e */
   function pointerPos(e) {
     return {
       x: e.pageX / document.documentElement.scrollWidth,
       y: e.pageY / document.documentElement.scrollHeight
-    }
+    };
+  }
+  /** @param {PointerEvent} e */
+  function setAudio(e) {
+    pointers[e.pointerId].audio.osc.frequency.value = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
+
+    /*
+    0->0, 1->0.5, ∞->1
+    y = x / (1 + x)
+
+    0->0, 1->1, ∞->2
+    y = 2x / (1 + x)
+
+    y = 2x / (1 + x); x
+    x = y / (2 - y)
+      = 1 / ((2 / y) - 1)
+    */
+    pointers[e.pointerId].audio.gain.gain.value = 1 / ((2 / pointers[e.pointerId].pos.x) - 1);
   }
 }
 
@@ -173,6 +185,7 @@ resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
