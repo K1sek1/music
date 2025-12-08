@@ -136,7 +136,6 @@ const pointers = {}; {
       = 1 / ((2 / y) - 1)
     */
     pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
-    pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
     pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
       1 / ((2 / pointers[e.pointerId].pos.x) - 1),
       audioCtx.currentTime + (isInit ? 0 : fadeDuration)
