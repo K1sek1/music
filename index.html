@@ -143,7 +143,7 @@ const pointers = {}; {
     pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
     pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
     pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
-      1 / ((2 / pointers[e.pointerId].pos.x) - 1),
+      pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x),
       audioCtx.currentTime + (isInit ? 0 : fadeDuration)
     );
     // console.log(pointers[e.pointerId].audio.gain.gain.value);
@@ -226,5 +226,3 @@ redraw();
   </script>
 </body>
 </html>
-
-
