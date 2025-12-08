@@ -106,8 +106,9 @@ const pointers = {}; {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
       pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
       pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration);
       delete pointers[e.pointerId];
       redraw()
     }
@@ -122,6 +123,7 @@ const pointers = {}; {
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
     pointers[e.pointerId].audio.osc.frequency.cancelScheduledValues(audioCtx.currentTime);
+    pointers[e.pointerId].audio.osc.frequency.setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime);
     pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(
       STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
       audioCtx.currentTime + (isInit ? 0 : fadeDuration)
@@ -139,6 +141,7 @@ const pointers = {}; {
       = 1 / ((2 / y) - 1)
     */
     pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
     pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
       1 / ((2 / pointers[e.pointerId].pos.x) - 1),
       audioCtx.currentTime + (isInit ? 0 : fadeDuration)
@@ -223,4 +226,3 @@ redraw();
   </script>
 </body>
 </html>
-
