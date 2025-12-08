@@ -28,6 +28,7 @@ const LOWER_LIMIT = -15;
 const RANGE = 24;
 // const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
+const fadeDuration = 0.01;
 
 
 
@@ -102,8 +103,9 @@ const pointers = {}; {
   function pointerEnd(e) {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 0.05);
+      pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration);
       delete pointers[e.pointerId];
     }
   }
@@ -116,9 +118,10 @@ const pointers = {}; {
   }
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
+    pointers[e.pointerId].audio.osc.frequency.cancelScheduledValues(audioCtx.currentTime);
     pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(
       STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
-      audioCtx.currentTime/* + (isInit ? 0 : 0.1)*/
+      audioCtx.currentTime + (isInit ? 0 : fadeDuration)
     );
 
     /*
@@ -132,9 +135,11 @@ const pointers = {}; {
     x = y / (2 - y)
       = 1 / ((2 / y) - 1)
     */
+    pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
     pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
       1 / ((2 / pointers[e.pointerId].pos.x) - 1),
-      audioCtx.currentTime/* + (isInit ? 0 : 0.1)*/
+      audioCtx.currentTime + (isInit ? 0 : fadeDuration)
     );
     // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
