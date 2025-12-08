@@ -52,8 +52,8 @@ const imag = new Float32Array(harmonics);
 
 // 1/fスペクトルを近似
 for (let i = 1; i < harmonics; i++) {
-  imag[i] = 1 / i; // 振幅を i に反比例
-  real[i] = 0;     // 位相ゼロ
+  imag[i] = 1 / i ** 2; // 振幅
+  real[i] = 0; // 位相
 }
 
 // PeriodicWaveを生成
