@@ -88,6 +88,7 @@ const pointers = {}; {
       //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
       //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE) * 100) / 100 - Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE))
       // );
+      redraw()
     }
   });
   addEventListener("pointermove", e => {
@@ -95,6 +96,7 @@ const pointers = {}; {
     if (pointers[e.pointerId]) {
       pointers[e.pointerId].pos = pointerPos(e);
       setAudio(e);
+      redraw()
     }
   });
   addEventListener("pointerup", pointerEnd);
@@ -107,6 +109,7 @@ const pointers = {}; {
       pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
       pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration);
       delete pointers[e.pointerId];
+      redraw()
     }
   }
   /** @param {PointerEvent} e */
@@ -159,20 +162,13 @@ Object.assign(canvas.style, {
 
 const ctx = canvas.getContext('2d');
 
-function resizeAndDraw() {
-  // スクロールバーを含まない実際の表示領域サイズを取得
-  const w = document.body.scrollWidth;
-  const h = document.body.scrollHeight;
-
-  canvas.width = w;
-  canvas.height = h;
+function redraw() {
+  const w = canvas.width;
+  const h = canvas.height;
 
   // 背景を黒で塗りつぶす
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, w, h);
-
-  // 仮想座標系: 上=0, 下=24
-  const maxY = 24;
 
   // 太線の位置
   const thickLines = [3, 6, 15, 18];
@@ -183,7 +179,7 @@ function resizeAndDraw() {
   ctx.strokeStyle = 'white';
   ctx.lineWidth = 2;
   thickLines.forEach(pos => {
-    const y = (pos / maxY) * h;
+    const y = (pos / RANGE) * h;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
@@ -194,7 +190,7 @@ function resizeAndDraw() {
   ctx.strokeStyle = 'white';
   ctx.lineWidth = 1;
   thinLines.forEach(pos => {
-    const y = (pos / maxY) * h;
+    const y = (pos / RANGE) * h;
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
@@ -210,12 +206,20 @@ function resizeAndDraw() {
     ctx.lineTo(w, y);
     ctx.stroke();
   });
-
-  requestAnimationFrame(resizeAndDraw);
 }
 
-addEventListener('resize', resizeAndDraw);
-resizeAndDraw();
+addEventListener("resize", () => {
+  const w = document.body.scrollWidth;
+  const h = document.body.scrollHeight;
+  canvas.width = w;
+  canvas.height = h;
+  redraw();
+});
+const w = document.body.scrollWidth;
+const h = document.body.scrollHeight;
+canvas.width = w;
+canvas.height = h;
+redraw();
   </script>
 </body>
 </html>
