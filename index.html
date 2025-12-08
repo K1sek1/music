@@ -79,8 +79,8 @@ const pointers = {}; {
   function pointerEnd(e) {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 0.1);
+      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.01);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + 0.01);
       delete pointers[e.pointerId];
     }
   }
@@ -92,9 +92,15 @@ const pointers = {}; {
     };
   }
   /** @param {PointerEvent} e */
-  function setAudio(e) {
-    pointers[e.pointerId].audio.osc.frequency.value = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
-    // pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y), audioCtx.currentTime + 0.1);
+  function setAudio(e, isInit = false) {
+    isInit
+      ? pointers[e.pointerId].audio.osc.frequency.value
+          = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y)
+      : pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(
+          STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
+          audioCtx.currentTime + 0.1
+        )
+    ;
 
     /*
     0->0, 1->0.5, ∞->1
@@ -107,8 +113,15 @@ const pointers = {}; {
     x = y / (2 - y)
       = 1 / ((2 / y) - 1)
     */
-    pointers[e.pointerId].audio.gain.gain.value = 1 / ((2 / pointers[e.pointerId].pos.x) - 1);
-    // pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(1 / ((2 / pointers[e.pointerId].pos.x) - 1), audioCtx.currentTime + 0.1);
+    isInit
+      ? pointers[e.pointerId].audio.gain.gain.value
+          = 1 / ((2 / pointers[e.pointerId].pos.x) - 1)
+      : pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
+          1 / ((2 / pointers[e.pointerId].pos.x) - 1),
+          audioCtx.currentTime + 0.1
+        )
+    ;
+    // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
 }
 
@@ -187,6 +200,7 @@ resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
