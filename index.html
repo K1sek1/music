@@ -57,7 +57,7 @@ const pointers = {}; {
         }
       };
       // pointers[e.pointerId].audio.osc.type = "square";
-      setAudio(e);
+      setAudio(e, true);
       pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
       pointers[e.pointerId].audio.osc.start();
       // console.log(
@@ -200,6 +200,7 @@ resizeAndDraw();
   </script>
 </body>
 </html>
+
 
 
 
