@@ -88,7 +88,7 @@ const pointers = {}; {
       //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
       //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE) * 100) / 100 - Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE))
       // );
-      redraw()
+      redraw();
     }
   });
   addEventListener("pointermove", e => {
@@ -96,7 +96,7 @@ const pointers = {}; {
     if (pointers[e.pointerId]) {
       pointers[e.pointerId].pos = pointerPos(e);
       setAudio(e);
-      redraw()
+      redraw();
     }
   });
   addEventListener("pointerup", pointerEnd);
@@ -110,7 +110,7 @@ const pointers = {}; {
       pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
       pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
-      redraw()
+      redraw();
     }
   }
   /** @param {PointerEvent} e */
@@ -226,3 +226,4 @@ redraw();
   </script>
 </body>
 </html>
+
