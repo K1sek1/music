@@ -19,7 +19,7 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register(
         "data:text/javascript,'v0.0';oninstall=skipWaiting;"
-      );
+      ).catch(()=>{});
     }
   </script>
 </head>
@@ -237,4 +237,5 @@ redraw();
 
 </body>
 </html>
+
 
