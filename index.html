@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width">
-  <title>Tone</title>
+  <title>Totate</title>
+  <link rel="icon-144.png" sizes="any">
   <style>
     :root {
       touch-action: none;
@@ -14,6 +15,13 @@
       padding: 0;
     }
   </style>
+  <script defer>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(
+        "data:text/javascript,'v0.0';oninstall=skipWaiting;"
+      );
+    }
+  </script>
 </head>
 <body>
 
@@ -229,3 +237,4 @@ redraw();
 
 </body>
 </html>
+
