@@ -16,7 +16,8 @@
   </style>
 </head>
 <body>
-  <script defer>
+
+<script defer>
 /** Hz */
 const STANDARD_PITCH = 440;
 
@@ -43,22 +44,22 @@ const audioCtx = new AudioContext();
 
 
 
-// 倍音数
-const harmonics = 512;
-
-const real = new Float32Array(harmonics);
-const imag = new Float32Array(harmonics);
-
-// real[0] = 0, imag[0] = 0;
-
-// 1/fスペクトルを近似
-for (let i = 1; i < harmonics; i++) {
-  imag[i] = i & 1 ? 1 / i ** 2 : 0; // 振幅
-  real[i] = 0; // 位相
-}
-
 // PeriodicWaveを生成
-const wave = audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+const wave = (() => {
+  const harmonics = 512; // 倍音数
+  const real = new Float32Array(harmonics);
+  const imag = new Float32Array(harmonics);
+
+  // real[0] = 0, imag[0] = 0;
+
+  // 1/fスペクトルを近似
+  for (let i = 1; i < harmonics; i++) {
+    imag[i] = (i ** -(i & 1 ? 1 : 2)) ** 2 * Math.abs((i - 16) / 15); // 振幅
+    real[i] = 0; // 位相
+  }
+
+  return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+})();
 
 
 
@@ -224,6 +225,7 @@ const h = document.body.scrollHeight;
 canvas.width = w;
 canvas.height = h;
 redraw();
-  </script>
+</script>
+
 </body>
 </html>
