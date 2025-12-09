@@ -5,10 +5,11 @@ const SEMITONE = 2 ** (1 / 12);
 
 
 
-const LOWER_LIMIT = STANDARD_PITCH * SEMITONE ** -3;
+const LOWER_LIMIT = -15;
 const RANGE = 24;
-const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
+// const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
+const fadeDuration = 1 / 60;
 
 
 
@@ -20,7 +21,29 @@ const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 // }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
 
 const audioCtx = new AudioContext();
-addEventListener("pointerdown", () => {
+
+
+
+// PeriodicWaveを生成
+const wave = (() => {
+  const harmonics = 512; // 倍音数
+  const real = new Float32Array(harmonics);
+  const imag = new Float32Array(harmonics);
+
+  // real[0] = 0, imag[0] = 0;
+
+  // 1/fスペクトルを近似
+  for (let i = 1; i < harmonics; i++) {
+    imag[i] = (i ** -(i & 1 ? 1 : 2)) ** 2 * Math.abs((i - 16) / 15); // 振幅
+    real[i] = 0; // 位相
+  }
+
+  return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+})();
+
+
+
+addEventListener("pointerup", () => {
   document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
     /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
   });
@@ -28,51 +51,157 @@ addEventListener("pointerdown", () => {
 /** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
 const pointers = {}; {
   addEventListener("pointerdown", e => {
-    console.log("down");
+    // console.log("down");
     if (e.button === 0) {
       pointers[e.pointerId] = {
-        pos: {
-          x: e.pageX / document.documentElement.scrollWidth,
-          y: e.pageY / document.documentElement.scrollHeight
-        },
+        pos: pointerPos(e),
         audio: {
           osc: audioCtx.createOscillator(),
           gain: audioCtx.createGain()
         }
       };
-      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
+      // pointers[e.pointerId].audio.osc.type = "square";
+      pointers[e.pointerId].audio.gain.gain.value = 0;
+      setAudio(e, true);
       pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
       pointers[e.pointerId].audio.osc.start();
+      // console.log(
+      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
+      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE) * 100) / 100 - Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE))
+      // );
+      redraw();
     }
   });
   addEventListener("pointermove", e => {
-    console.log("move");
+    // console.log("move");
     if (pointers[e.pointerId]) {
-      pointers[e.pointerId].pos.x = e.pageX / document.documentElement.scrollWidth;
-      pointers[e.pointerId].pos.y = e.pageY / document.documentElement.scrollHeight;
-      pointers[e.pointerId].audio.osc.frequency.value = LOWER_LIMIT * SEMITONE ** (RANGE * pointers[e.pointerId].pos.y);
-      pointers[e.pointerId].audio.gain.gain.value = pointers[e.pointerId].pos.x;
+      pointers[e.pointerId].pos = pointerPos(e);
+      setAudio(e);
+      redraw();
     }
   });
-  addEventListener("pointerup", e => {
-    console.log("up");
+  addEventListener("pointerup", pointerEnd);
+  addEventListener("pointercancel", pointerEnd);
+  /** @param {PointerEvent} e */
+  function pointerEnd(e) {
+    // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.osc.stop();
+      pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+      pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
+      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
+      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
+      redraw();
     }
-  });
-  addEventListener("pointercancel", e => {
-    console.log("cancel");
-    if (e.button === 0) {
-      pointers[e.pointerId].audio.osc.stop();
-      delete pointers[e.pointerId];
-    }
-  });
+  }
+  /** @param {PointerEvent} e */
   function pointerPos(e) {
     return {
       x: e.pageX / document.documentElement.scrollWidth,
       y: e.pageY / document.documentElement.scrollHeight
-    }
+    };
+  }
+  /** @param {PointerEvent} e */
+  function setAudio(e, isInit = false) {
+    pointers[e.pointerId].audio.osc.frequency.cancelScheduledValues(audioCtx.currentTime);
+    pointers[e.pointerId].audio.osc.frequency.setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime);
+    pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(
+      STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
+      audioCtx.currentTime + (isInit ? 0 : fadeDuration)
+    );
+
+    /*
+    0->0, 1->0.5, ∞->1
+    y = x / (1 + x)
+
+    0->0, 1->1, ∞->2
+    y = 2x / (1 + x)
+
+    y = 2x / (1 + x); x
+    x = y / (2 - y)
+      = 1 / ((2 / y) - 1)
+    */
+    pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
+    pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
+    pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
+      pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x),
+      audioCtx.currentTime + fadeDuration
+    );
+    // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
 }
+
+
+
+// canvas 要素を生成
+const canvas = document.createElement('canvas');
+document.body.appendChild(canvas);
+
+// スタイル設定（画面いっぱい）
+Object.assign(canvas.style, {
+  width: '100vw',
+  height: '100vh',
+  display: 'block'
+});
+
+const ctx = canvas.getContext('2d');
+
+function redraw() {
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // 背景を黒で塗りつぶす
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, w, h);
+
+  // 太線の位置
+  const thickLines = [3, 6, 15, 18];
+  // 細線の位置
+  const thinLines = [1, 5, 8, 10, 11, 13, 17, 20, 22, 23];
+
+  // 太線を描画
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 2;
+  thickLines.forEach(pos => {
+    const y = (pos / RANGE) * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+
+  // 細線を描画
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1;
+  thinLines.forEach(pos => {
+    const y = (pos / RANGE) * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = 'red';
+  ctx.lineWidth = 1;
+  Object.values(pointers).forEach(pointer => {
+    const y = pointer.pos.y * h;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  });
+}
+
+addEventListener("resize", () => {
+  const w = document.body.scrollWidth;
+  const h = document.body.scrollHeight;
+  canvas.width = w;
+  canvas.height = h;
+  redraw();
+});
+const w = document.body.scrollWidth;
+const h = document.body.scrollHeight;
+canvas.width = w;
+canvas.height = h;
+redraw();

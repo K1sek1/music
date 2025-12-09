@@ -1,0 +1,11 @@
+{
+  "name": "Totate",
+  "icons": [
+    {
+      "src": "icon-144.png",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "display": "fullscreen"
+}
