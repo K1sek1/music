@@ -34,7 +34,7 @@ const wave = (() => {
 
   // 1/fスペクトルを近似
   for (let i = 1; i < harmonics; i++) {
-    imag[i] = (i ** -(i & 1 ? 1 : 2)) ** 2 * Math.abs((i - 16) / 15) / i; // 振幅
+    imag[i] = (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i; // 振幅
     real[i] = 0; // 位相
   }
 
@@ -206,3 +206,4 @@ canvas.width = w;
 canvas.height = h;
 
 redraw();
+
