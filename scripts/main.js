@@ -34,10 +34,13 @@ const wave = (() => {
 
   // 1/fスペクトルを近似
   for (let i = 1; i < harmonics; i++) {
-    imag[i] = (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i; // 振幅
+    // i & 1 ? 1 / i ** 2 : 0
+    // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
+    imag[i] = ((i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i); // 振幅
     real[i] = 0; // 位相
   }
 
+  console.log(imag);
   return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
 })();
 
@@ -64,7 +67,10 @@ const pointers = {}; {
       // pointers[e.pointerId].audio.osc.type = "square";
       pointers[e.pointerId].audio.gain.gain.value = 0;
       setAudio(e, true);
-      pointers[e.pointerId].audio.osc.connect(pointers[e.pointerId].audio.gain).connect(audioCtx.destination);
+      pointers[e.pointerId].audio.osc
+        .connect(pointers[e.pointerId].audio.gain)
+        .connect(audioCtx.destination)
+      ;
       pointers[e.pointerId].audio.osc.start();
       // console.log(
       //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
@@ -87,9 +93,11 @@ const pointers = {}; {
   function pointerEnd(e) {
     // console.log("end (up|cancel)");
     if (e.button === 0) {
-      pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
-      pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
-      pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration);
+      pointers[e.pointerId].audio.gain.gain
+        .cancelScheduledValues(audioCtx.currentTime)
+        .setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime)
+        .linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration)
+      ;
       pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
       redraw();
@@ -104,12 +112,14 @@ const pointers = {}; {
   }
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
-    pointers[e.pointerId].audio.osc.frequency.cancelScheduledValues(audioCtx.currentTime);
-    pointers[e.pointerId].audio.osc.frequency.setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime);
-    pointers[e.pointerId].audio.osc.frequency.linearRampToValueAtTime(
-      STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
-      audioCtx.currentTime + (isInit ? 0 : fadeDuration)
-    );
+    pointers[e.pointerId].audio.osc.frequency
+      .cancelScheduledValues(audioCtx.currentTime)
+      .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
+      .linearRampToValueAtTime(
+        STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
+        audioCtx.currentTime + (isInit ? 0 : fadeDuration)
+      )
+    ;
 
     /*
     0->0, 1->0.5, ∞->1
@@ -122,12 +132,14 @@ const pointers = {}; {
     x = y / (2 - y)
       = 1 / ((2 / y) - 1)
     */
-    pointers[e.pointerId].audio.gain.gain.cancelScheduledValues(audioCtx.currentTime);
-    pointers[e.pointerId].audio.gain.gain.setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime);
-    pointers[e.pointerId].audio.gain.gain.linearRampToValueAtTime(
-      pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x),
-      audioCtx.currentTime + fadeDuration
-    );
+    pointers[e.pointerId].audio.gain.gain
+      .cancelScheduledValues(audioCtx.currentTime)
+      .setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime)
+      .linearRampToValueAtTime(
+        pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5,
+        audioCtx.currentTime + fadeDuration
+      )
+    ;
     // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
 }
@@ -204,6 +216,4 @@ const w = document.body.scrollWidth;
 const h = document.body.scrollHeight;
 canvas.width = w;
 canvas.height = h;
-
 redraw();
-
