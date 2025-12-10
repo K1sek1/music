@@ -40,7 +40,7 @@ const wave = (() => {
     real[i] = 0; // 位相
   }
 
-  console.log(imag);
+  // console.log(imag);
   return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
 })();
 
@@ -217,3 +217,4 @@ const h = document.body.scrollHeight;
 canvas.width = w;
 canvas.height = h;
 redraw();
+
