@@ -36,7 +36,8 @@ const wave = (() => {
   for (let i = 1; i < harmonics; i++) {
     // i & 1 ? 1 / i ** 2 : 0
     // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
-    imag[i] = ((i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i); // 振幅
+    // (i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i
+    imag[i] = ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8]); // 振幅
     real[i] = 0; // 位相
   }
 
@@ -217,4 +218,3 @@ const h = document.body.scrollHeight;
 canvas.width = w;
 canvas.height = h;
 redraw();
-
