@@ -156,7 +156,6 @@ const dpr = devicePixelRatio || 1;
 function resizeCanvases() {
   const w = visualViewport.width;
   const h = visualViewport.height;
-  console.log(w, h, dpr);
   [bg, fg].forEach(c => {
     c.width = Math.round(w * dpr);
     c.height = Math.round(h * dpr);
