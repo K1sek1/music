@@ -5,8 +5,8 @@ const SEMITONE = 2 ** (1 / 12);
 
 
 
-const LOWER_LIMIT = -15;
-const RANGE = 24;
+const LOWER_LIMIT = -21;
+const RANGE = 36;
 // const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
 const fadeDuration = 1 / 60;
@@ -55,7 +55,6 @@ addEventListener("pointerup", () => {
 /** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
 const pointers = {}; {
   addEventListener("pointerdown", e => {
-    // console.log("down");
     if (e.button === 0) {
       pointers[e.pointerId] = {
         pos: pointerPos(e),
@@ -73,26 +72,20 @@ const pointers = {}; {
         .connect(audioCtx.destination)
       ;
       pointers[e.pointerId].audio.osc.start();
-      // console.log(
-      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE)), 
-      //   Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE) * 100) / 100 - Math.round(Math.log(pointers[e.pointerId].audio.osc.frequency.value / STANDARD_PITCH) / Math.log(SEMITONE))
-      // );
-      redraw();
+      drawFg();
     }
   });
   addEventListener("pointermove", e => {
-    // console.log("move");
     if (pointers[e.pointerId]) {
       pointers[e.pointerId].pos = pointerPos(e);
       setAudio(e);
-      redraw();
+      drawFg();
     }
   });
   addEventListener("pointerup", pointerEnd);
   addEventListener("pointercancel", pointerEnd);
   /** @param {PointerEvent} e */
   function pointerEnd(e) {
-    // console.log("end (up|cancel)");
     if (e.button === 0) {
       pointers[e.pointerId].audio.gain.gain
         .cancelScheduledValues(audioCtx.currentTime)
@@ -101,7 +94,7 @@ const pointers = {}; {
       ;
       pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
       delete pointers[e.pointerId];
-      redraw();
+      drawFg();
     }
   }
   /** @param {PointerEvent} e */
@@ -141,80 +134,80 @@ const pointers = {}; {
         audioCtx.currentTime + fadeDuration
       )
     ;
-    // console.log(pointers[e.pointerId].audio.gain.gain.value);
   }
 }
 
 
 
 // canvas 要素を生成
-const canvas = document.createElement('canvas');
-document.body.appendChild(canvas);
+const bg = document.createElement('canvas');
+const fg = document.createElement('canvas');
 
-// スタイル設定（画面いっぱい）
-Object.assign(canvas.style, {
-  width: '100vw',
-  height: '100vh',
-  display: 'block'
-});
+const bgCtx = bg.getContext('2d');
+const fgCtx = fg.getContext('2d');
 
-const ctx = canvas.getContext('2d');
-
-function redraw() {
-  const w = canvas.width;
-  const h = canvas.height;
-
-  // 背景を黒で塗りつぶす
-  ctx.fillStyle = 'black';
-  ctx.fillRect(0, 0, w, h);
-
-  // 太線の位置
-  const thickLines = [3, 6, 15, 18];
-  // 細線の位置
-  const thinLines = [1, 5, 8, 10, 11, 13, 17, 20, 22, 23];
-
-  // 太線を描画
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 2;
-  thickLines.forEach(pos => {
-    const y = (pos / RANGE) * h;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  });
-
-  // 細線を描画
-  ctx.strokeStyle = 'white';
-  ctx.lineWidth = 1;
-  thinLines.forEach(pos => {
-    const y = (pos / RANGE) * h;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  });
-
-  ctx.strokeStyle = 'red';
-  ctx.lineWidth = 1;
-  Object.values(pointers).forEach(pointer => {
-    const y = pointer.pos.y * h;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
-    ctx.stroke();
-  });
-}
-
-addEventListener("resize", () => {
-  const w = document.body.scrollWidth;
-  const h = document.body.scrollHeight;
-  canvas.width = w;
-  canvas.height = h;
-  redraw();
-});
 const w = document.body.scrollWidth;
 const h = document.body.scrollHeight;
-canvas.width = w;
-canvas.height = h;
-redraw();
+
+Object.assign(bg.style, { position: "absolute" });
+Object.assign(fg.style, { position: "absolute" });
+
+const dpr = devicePixelRatio || 1;
+function resizeCanvases() {
+  const w = visualViewport.width;
+  const h = visualViewport.height;
+  console.log(w, h, dpr);
+  [bg, fg].forEach(c => {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    c.style.width = w + "px";
+    c.style.height = h + "px";
+  });
+  bgCtx.scale(dpr, dpr);
+  fgCtx.scale(dpr, dpr);
+  drawBg();
+  drawFg();
+}
+addEventListener("resize", resizeCanvases);
+resizeCanvases();
+
+document.body.append(bg, fg);
+
+function drawBg() {
+  const w = visualViewport.width;
+  const h = visualViewport.height;
+
+  bgCtx.clearRect(0, 0, w, h);
+
+  bgCtx.strokeStyle = "white";
+  for (let i = 1; i < RANGE; ++i) {
+    const data = [2, 0, 1, 0, 1, 1, 0, 1, 0, 2, 0, 1][((LOWER_LIMIT + i - 3) % 12 + 12) % 12];
+    if (data) {
+      bgCtx.beginPath();
+      bgCtx.lineWidth = data;
+      const y = (i / RANGE) * h;
+      bgCtx.moveTo(0, y);
+      bgCtx.lineTo(w, y);
+      bgCtx.stroke();
+    }
+  }
+}
+
+function drawFg() {
+  const w = visualViewport.width;
+  const h = visualViewport.height;
+
+  fgCtx.clearRect(0, 0, w, h);
+  fgCtx.beginPath();
+
+  fgCtx.strokeStyle = "red";
+  fgCtx.lineWidth = 1;
+  Object.values(pointers).forEach(pointer => {
+    const y = pointer.pos.y * h;
+    fgCtx.moveTo(0, y);
+    fgCtx.lineTo(w, y);
+  });
+  fgCtx.stroke();
+}
+
+drawBg();
