@@ -37,11 +37,13 @@ const wave = (() => {
     // i & 1 ? 1 / i ** 2 : 0
     // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
     // (i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i
-    imag[i] = ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8]); // 振幅
+    // ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8])
+    // i === 1 ? 0 : ((k, p) => 1 / (1 + (((i-1) - 1) / k) ** p))(...[[8, 4], [0.5, 8], [1, 8], [0.5, 8]][i - 2 & 3])
+    imag[i] = ((C, k, p) => C / (1 + ((i - 1) / k) ** p))(i & 1 ? 1 : 0.75, 3.25, 3.25); // 振幅
     real[i] = 0; // 位相
   }
 
-  // console.log(imag);
+  console.log(imag);
   return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
 })();
 
