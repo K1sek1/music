@@ -1,6 +1,6 @@
 "use strict";
 
-alert("The version is:\n" + "20be71af-fec1-4026-97c5-17534fd869a6");
+alert("The version is:\n" + "43a9e9ef-5966-413b-8fb1-c52e5d1b38bd");
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -145,8 +145,6 @@ const pointers = {}; {
       .cancelScheduledValues(audioCtx.currentTime)
       .setValueAtTime(
         pointers[e.pointerId].audio.gain.gain.value
-          * getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value)
-          / getGainFromFrequency(frequency)
         ,
         audioCtx.currentTime
       )
