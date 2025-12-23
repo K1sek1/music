@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("The version is:\n" + "a1f35a2c-5f23-4b48-9e6a-e81c9653ce45"), { once: true });
+addEventListener("load", () => alert("The version is:\n" + "45da953e-8cbe-4c52-b42a-8ef0d3880696"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -160,7 +160,7 @@ const pointers = {}; {
 
     const oldGain = pointers[e.pointerId].audio.gain.gain.value;
     const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
-    const gainRatio = getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value) / getGainFromFrequency(newFrequency);
+    const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
     const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
     const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
     
