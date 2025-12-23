@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("The version is:\n" + "45da953e-8cbe-4c52-b42a-8ef0d3880696"), { once: true });
+addEventListener("load", () => alert("The version is:\n" + "8170c18d-71c7-4d32-ada7-d714ed9e1c7f"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -47,13 +47,10 @@ const pointers = {}; {
       pointers[e.pointerId] = {
         pos: pointerPos(e),
         audio: {
-          osc: audioCtx.createOscillator(),
-          gain: audioCtx.createGain()
+          osc: new OscillatorNode(audioCtx),
+          gain: new GainNode(audioCtx, { gain: 0 })
         }
       };
-      // pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
-      // pointers[e.pointerId].audio.osc.type = "triangle";
-      pointers[e.pointerId].audio.gain.gain.value = 0;
       setAudio(e, true);
       pointers[e.pointerId].audio.osc
         .connect(pointers[e.pointerId].audio.gain)
@@ -97,18 +94,23 @@ const pointers = {}; {
     const newFrequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
     const nextBlockTime = (Math.floor(audioCtx.currentTime / (128 / audioCtx.sampleRate)) + 1) * (128 / audioCtx.sampleRate)
 
-    pointers[e.pointerId].audio.osc.frequency
-      .cancelScheduledValues(audioCtx.currentTime)
-      .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
-      .linearRampToValueAtTime(
-        newFrequency,
-        audioCtx.currentTime + (isInit ? 0 : fadeDuration)
-      )
-    ;
+    if (isInit) {
+      pointers[e.pointerId].audio.osc.frequency.value = newFrequency
+    } else {
+      pointers[e.pointerId].audio.osc.frequency
+        .cancelScheduledValues(audioCtx.currentTime)
+        .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
+        .linearRampToValueAtTime(
+          newFrequency,
+          audioCtx.currentTime + fadeDuration
+        )
+      ;
+    }
 
     pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
       /** 倍音数 */
-      const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
+      const harmonics = 2;
+      // const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
 
       const real = new Float32Array(harmonics);
       const imag = new Float32Array(harmonics);
