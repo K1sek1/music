@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "09d18c5a-748a-458b-806e-dd0b2c54a5d9"), { once: true });
+addEventListener("load", () => alert("version:\n" + "dd0c84ce-2da9-470b-a266-736c8beb945a"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -129,7 +129,7 @@ const pointers = {}; {
         real[i] = 0;
       }
 
-      console.log(imag);
+      // console.log(imag);
       return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
     })());
 
