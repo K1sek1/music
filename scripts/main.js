@@ -22,34 +22,6 @@ const fadeDuration = 1 / 60;
 
 const audioCtx = new AudioContext();
 
-
-
-// // PeriodicWaveを生成
-// const wave = (() => {
-//   const harmonics = 512; // 倍音数
-//   const real = new Float32Array(harmonics);
-//   const imag = new Float32Array(harmonics);
-
-//   // real[0] = 0, imag[0] = 0;
-
-//   // 1/fスペクトルを近似
-//   for (let i = 1; i < harmonics; i++) {
-//     // i & 1 ? 1 / i ** 2 : 0
-//     // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
-//     // (i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i
-//     // ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8])
-//     // i === 1 ? 0 : ((k, p) => 1 / (1 + (((i-1) - 1) / k) ** p))(...[[8, 4], [0.5, 8], [1, 8], [0.5, 8]][i - 2 & 3])
-//     // ((C, k, p) => C / (1 + ((i - 1) / k) ** p))(i & 1 ? 1 : 0.625, 2.75, 3.375)
-//     imag[i] = ((C, k, p) => C / (1 + (i / k) ** p))(...i & 1 ? [1, 2.75, 3.375] : [0.001, 2.75, 3.]); // 振幅
-//     real[i] = 0; // 位相
-//   }
-
-//   console.log(imag);
-//   return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
-// })();
-
-
-
 addEventListener("pointerup", () => {
   document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
     /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
@@ -109,30 +81,41 @@ const pointers = {}; {
   }
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
+    const frequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
     pointers[e.pointerId].audio.osc.frequency
       .cancelScheduledValues(audioCtx.currentTime)
       .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
       .linearRampToValueAtTime(
-        STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y),
+        frequency,
         audioCtx.currentTime + (isInit ? 0 : fadeDuration)
       )
     ;
 
     pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
-      const harmonics = 512; // 倍音数
+      /** 倍音数 */
+      const harmonics = Math.ceil(audioCtx.sampleRate / 2 / frequency - 1);
+
       const real = new Float32Array(harmonics);
       const imag = new Float32Array(harmonics);
 
       for (let i = 1; i < harmonics; i++) {
-        imag[i] = ((n, C, p, q, k, s) =>
-          C * n ** -p *
-          ((1 + (n / k) ** s) ** -((q - p) / s))
+        // 振幅
+        imag[i] =
+          i ** -2 * (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / (frequency * i))
+        ;
 
-          * 20 / (pointers[e.pointerId].audio.osc.frequency.value * n)
-        )(i, 1, 1, 1, 1, 1); // 振幅
-        real[i] = 0; // 位相
+        // imag[i] = ((n, C, p, q, k, s) =>
+        //   C * n ** -p *
+        //   ((1 + (n / k) ** s) ** -((q - p) / s))
+
+        //   * (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / (frequency * n)) ** (1 / 1)
+        // )(i, 1, 2, 1, 1, 1);
+
+        // 位相
+        real[i] = 0;
       }
 
+      console.log(imag);
       return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
     })());
 
@@ -157,6 +140,7 @@ const pointers = {}; {
     ;
   }
 }
+
 
 
 // #region draw
