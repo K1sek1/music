@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "dd0c84ce-2da9-470b-a266-736c8beb945a"), { once: true });
+addEventListener("load", () => alert("version:\n" + "a3106b12-6ca2-4146-84a0-0517ea43c375"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -159,11 +159,38 @@ const pointers = {}; {
       )
     ;
 
+    // const oldGain = pointers[e.pointerId].audio.gain.gain.value;
+    // const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
+    // const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
+    // const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
+    // const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
+    
+    // pointers[e.pointerId].audio.gain.gain
+    //   .cancelScheduledValues(audioCtx.currentTime)
+    //   .setValueAtTime(
+    //     oldGain,
+    //     audioCtx.currentTime
+    //   )
+    //   .linearRampToValueAtTime(
+    //     oldGain * r2 + targetGain * gainRatio * r1,
+    //     nextBlockTime - 128 / audioCtx.sampleRate
+    //   )
+    //   .setValueAtTime(
+    //     oldGain / gainRatio * r2 + targetGain * r1,
+    //     nextBlockTime
+    //   )
+    //   .linearRampToValueAtTime(
+    //     targetGain,
+    //     audioCtx.currentTime + fadeDuration
+    //   )
+    // ;
     const oldGain = pointers[e.pointerId].audio.gain.gain.value;
     const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
     const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
     const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
     const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
+    const r3 = ((nextBlockTime - 128 / audioCtx.sampleRate) - audioCtx.currentTime) / fadeDuration;
+    const r4 = (audioCtx.currentTime + fadeDuration - (nextBlockTime - 128 / audioCtx.sampleRate)) / fadeDuration;
     
     pointers[e.pointerId].audio.gain.gain
       .cancelScheduledValues(audioCtx.currentTime)
@@ -172,7 +199,7 @@ const pointers = {}; {
         audioCtx.currentTime
       )
       .linearRampToValueAtTime(
-        oldGain * r2 + targetGain * gainRatio * r1,
+        oldGain * r4 + targetGain * gainRatio * r3,
         nextBlockTime - 128 / audioCtx.sampleRate
       )
       .setValueAtTime(
