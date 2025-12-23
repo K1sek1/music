@@ -1,6 +1,6 @@
 "use strict";
 
-alert("The version is:\n" + "1864c454-1610-4af9-9d6a-e98079ee59d5");
+alert("The version is:\n" + "20be71af-fec1-4026-97c5-17534fd869a6");
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -113,7 +113,7 @@ const pointers = {}; {
 
       for (let i = 1; i < harmonics; i++) {
         // 振幅
-        imag[i] = i ** -2 * getGainFromFrequency(frequency * i);
+        imag[i] = i ** -3;
 
         // imag[i] = ((n, C, p, q, k, s) =>
         //   C * n ** -p *
@@ -143,7 +143,13 @@ const pointers = {}; {
     */
     pointers[e.pointerId].audio.gain.gain
       .cancelScheduledValues(audioCtx.currentTime)
-      .setValueAtTime(pointers[e.pointerId].audio.gain.gain.value * getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value) / getGainFromFrequency(frequency), audioCtx.currentTime)
+      .setValueAtTime(
+        pointers[e.pointerId].audio.gain.gain.value
+          * getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value)
+          / getGainFromFrequency(frequency)
+        ,
+        audioCtx.currentTime
+      )
       .linearRampToValueAtTime(
         pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5,
         audioCtx.currentTime + fadeDuration
