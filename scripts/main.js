@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "7b45c377-5d30-4429-8945-e9f4d5e6c68e"), { once: true });
+addEventListener("load", () => alert("version:\n" + "25bdb653-4b95-4223-a04e-d002159bf353"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -21,7 +21,7 @@ const fadeDuration = 1 / 60;
  * @returns {number} gain 0-1を返す想定だが保証はしない
  */
 function getGainFromFrequency(frequency) {
-  return (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / frequency) ** 2
+  return (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / frequency) ** 1
 }
 
 
@@ -116,7 +116,7 @@ const pointers = {}; {
 
       for (let i = 1; i < harmonics; i++) {
         // 振幅
-        imag[i] = i ** -1 * getGainFromFrequency(newFrequency * i);
+        imag[i] = i ** -2 * getGainFromFrequency(newFrequency * i);
 
         // imag[i] = ((n, C, p, q, k, s) =>
         //   C * n ** -p *
