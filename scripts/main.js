@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "7a33bb54-286a-457a-a41e-b71ecba3f5b7"), { once: true });
+addEventListener("load", () => alert("version:\n" + "09d18c5a-748a-458b-806e-dd0b2c54a5d9"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -109,8 +109,7 @@ const pointers = {}; {
 
     pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
       /** 倍音数 */
-      const harmonics = 2;
-      // const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
+      const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
 
       const real = new Float32Array(harmonics);
       const imag = new Float32Array(harmonics);
