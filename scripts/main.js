@@ -1,3 +1,7 @@
+"use strict";
+
+alert("This version is:\n5465a8c9-efde-42ba-8884-14a35d609a5a");
+
 /** Hz */
 const STANDARD_PITCH = 440;
 
@@ -101,7 +105,7 @@ const pointers = {}; {
       for (let i = 1; i < harmonics; i++) {
         // 振幅
         imag[i] =
-          i ** -2 * (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / (frequency * i))
+          i ** -3// * (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / (frequency * i))
         ;
 
         // imag[i] = ((n, C, p, q, k, s) =>
