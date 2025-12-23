@@ -1,6 +1,6 @@
 "use strict";
 
-alert("The version is:\n" + "43a9e9ef-5966-413b-8fb1-c52e5d1b38bd");
+addEventListener("load", () => alert("The version is:\n" + "45da953e-8cbe-4c52-b42a-8ef0d3880696"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -94,26 +94,28 @@ const pointers = {}; {
   }
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
-    const frequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
+    const newFrequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
+    const nextBlockTime = (Math.floor(audioCtx.currentTime / (128 / audioCtx.sampleRate)) + 1) * (128 / audioCtx.sampleRate)
+
     pointers[e.pointerId].audio.osc.frequency
       .cancelScheduledValues(audioCtx.currentTime)
       .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
       .linearRampToValueAtTime(
-        frequency,
+        newFrequency,
         audioCtx.currentTime + (isInit ? 0 : fadeDuration)
       )
     ;
 
     pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
       /** 倍音数 */
-      const harmonics = Math.floor(audioCtx.sampleRate / 2 / frequency) - 1;
+      const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
 
       const real = new Float32Array(harmonics);
       const imag = new Float32Array(harmonics);
 
       for (let i = 1; i < harmonics; i++) {
         // 振幅
-        imag[i] = i ** -3;
+        imag[i] = i ** -2 * getGainFromFrequency(newFrequency * i);
 
         // imag[i] = ((n, C, p, q, k, s) =>
         //   C * n ** -p *
@@ -126,7 +128,7 @@ const pointers = {}; {
         real[i] = 0;
       }
 
-      // console.log(imag);
+      console.log(imag);
       return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
     })());
 
@@ -145,11 +147,39 @@ const pointers = {}; {
       .cancelScheduledValues(audioCtx.currentTime)
       .setValueAtTime(
         pointers[e.pointerId].audio.gain.gain.value
+          * getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value)
+          / getGainFromFrequency(newFrequency)
         ,
         audioCtx.currentTime
       )
       .linearRampToValueAtTime(
         pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5,
+        audioCtx.currentTime + fadeDuration
+      )
+    ;
+
+    const oldGain = pointers[e.pointerId].audio.gain.gain.value;
+    const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
+    const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
+    const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
+    const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
+    
+    pointers[e.pointerId].audio.gain.gain
+      .cancelScheduledValues(audioCtx.currentTime)
+      .setValueAtTime(
+        oldGain,
+        audioCtx.currentTime
+      )
+      .linearRampToValueAtTime(
+        oldGain * r2 + targetGain * gainRatio * r1,
+        nextBlockTime - 128 / audioCtx.sampleRate
+      )
+      .setValueAtTime(
+        oldGain / gainRatio * r2 + targetGain * r1,
+        nextBlockTime
+      )
+      .linearRampToValueAtTime(
+        targetGain,
         audioCtx.currentTime + fadeDuration
       )
     ;
