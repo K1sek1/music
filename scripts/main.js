@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("The version is:\n" + "8170c18d-71c7-4d32-ada7-d714ed9e1c7f"), { once: true });
+addEventListener("load", () => alert("version:\n" + "7a33bb54-286a-457a-a41e-b71ecba3f5b7"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
