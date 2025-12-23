@@ -93,7 +93,7 @@ const pointers = {}; {
 
     pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
       /** 倍音数 */
-      const harmonics = Math.ceil(audioCtx.sampleRate / 2 / frequency - 1);
+      const harmonics = Math.floor(audioCtx.sampleRate / 2 / frequency) - 1;
 
       const real = new Float32Array(harmonics);
       const imag = new Float32Array(harmonics);
