@@ -126,7 +126,7 @@ const pointers = {}; {
         real[i] = 0;
       }
 
-      console.log(imag);
+      // console.log(imag);
       return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
     })());
 
