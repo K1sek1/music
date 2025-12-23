@@ -24,28 +24,29 @@ const audioCtx = new AudioContext();
 
 
 
-// PeriodicWaveを生成
-const wave = (() => {
-  const harmonics = 512; // 倍音数
-  const real = new Float32Array(harmonics);
-  const imag = new Float32Array(harmonics);
+// // PeriodicWaveを生成
+// const wave = (() => {
+//   const harmonics = 512; // 倍音数
+//   const real = new Float32Array(harmonics);
+//   const imag = new Float32Array(harmonics);
 
-  // real[0] = 0, imag[0] = 0;
+//   // real[0] = 0, imag[0] = 0;
 
-  // 1/fスペクトルを近似
-  for (let i = 1; i < harmonics; i++) {
-    // i & 1 ? 1 / i ** 2 : 0
-    // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
-    // (i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i
-    // ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8])
-    // i === 1 ? 0 : ((k, p) => 1 / (1 + (((i-1) - 1) / k) ** p))(...[[8, 4], [0.5, 8], [1, 8], [0.5, 8]][i - 2 & 3])
-    imag[i] = ((C, k, p) => C / (1 + ((i - 1) / k) ** p))(...i & 1 ? [1, 2.75, 3.375] : [0.0625, 5, 2]); // 振幅
-    real[i] = 0; // 位相
-  }
+//   // 1/fスペクトルを近似
+//   for (let i = 1; i < harmonics; i++) {
+//     // i & 1 ? 1 / i ** 2 : 0
+//     // (i ** -(i & 1 ? 1 : 2)) * Math.abs((i - 16) / 15) / i
+//     // (i & 1 ? i ** -1 : i ** -2) * Math.abs((i - 16) / 15) / i
+//     // ((k, p) => 1 / (1 + ((i - 1) / k) ** p))(...i & 1 ? [4, 4] : [0.5, 8])
+//     // i === 1 ? 0 : ((k, p) => 1 / (1 + (((i-1) - 1) / k) ** p))(...[[8, 4], [0.5, 8], [1, 8], [0.5, 8]][i - 2 & 3])
+//     // ((C, k, p) => C / (1 + ((i - 1) / k) ** p))(i & 1 ? 1 : 0.625, 2.75, 3.375)
+//     imag[i] = ((C, k, p) => C / (1 + (i / k) ** p))(...i & 1 ? [1, 2.75, 3.375] : [0.001, 2.75, 3.]); // 振幅
+//     real[i] = 0; // 位相
+//   }
 
-  console.log(imag);
-  return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
-})();
+//   console.log(imag);
+//   return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+// })();
 
 
 
@@ -65,8 +66,8 @@ const pointers = {}; {
           gain: audioCtx.createGain()
         }
       };
-      pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
-      // pointers[e.pointerId].audio.osc.type = "square";
+      // pointers[e.pointerId].audio.osc.setPeriodicWave(wave);
+      // pointers[e.pointerId].audio.osc.type = "triangle";
       pointers[e.pointerId].audio.gain.gain.value = 0;
       setAudio(e, true);
       pointers[e.pointerId].audio.osc
@@ -117,6 +118,24 @@ const pointers = {}; {
       )
     ;
 
+    pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
+      const harmonics = 512; // 倍音数
+      const real = new Float32Array(harmonics);
+      const imag = new Float32Array(harmonics);
+
+      for (let i = 1; i < harmonics; i++) {
+        imag[i] = ((n, C, p, q, k, s) =>
+          C * n ** -p *
+          ((1 + (n / k) ** s) ** -((q - p) / s))
+
+          * 20 / (pointers[e.pointerId].audio.osc.frequency.value * n)
+        )(i, 1, 1, 1, 1, 1); // 振幅
+        real[i] = 0; // 位相
+      }
+
+      return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
+    })());
+
     /*
     0->0, 1->0.5, ∞->1
     y = x / (1 + x)
@@ -140,7 +159,7 @@ const pointers = {}; {
 }
 
 
-
+// #region draw
 // canvas 要素を生成
 const bg = document.createElement('canvas');
 const fg = document.createElement('canvas');
@@ -212,6 +231,4 @@ function drawFg() {
 }
 
 drawBg();
-
-
-
+// #endregion
