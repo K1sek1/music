@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "d80436e3-4903-48cb-a406-c074d97ce213"), { once: true });
+addEventListener("load", () => alert("version:\n" + "689dafa8-f1d3-42c0-b0d0-c8168ca4b2f1"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -52,11 +52,12 @@ const audioWorklet = {
 
 
 
-// addEventListener("pointerup", () => {
-//   document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
-//     /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
-//   });
-// }, { once: true });
+addEventListener("pointerup", () => {
+  document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
+    screen.orientation.lock("portrait-primary").catch(() => {});
+    audioCtx.resume();
+  });
+}, { once: true });
 /** @type {{ [key: number]: { pos: [number, number], audio: AudioWorkletNode } }} */
 const pointers = {};
 audioCtx.audioWorklet.addModule(audioWorklet.moduleURL).then(() => {
