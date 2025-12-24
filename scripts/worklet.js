@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_HARMONICS = 64;
+const MAX_HARMONICS = 2;
 const STANDARD_PITCH = 440;
 
 const TABLE_SIZE = 1 << 11;         // 2048 = 2^11
