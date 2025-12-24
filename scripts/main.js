@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "72a2363e-ba3d-4e44-8197-1e21d5cd8802"), { once: true });
+addEventListener("load", () => alert("version:\n" + "b37b0fdf-cd3a-4cf7-a4ab-440212727a7b"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -91,7 +91,7 @@ audioCtx.audioWorklet.addModule(audioWorklet.moduleURL).then(() => {
       ;
       setTimeout(audio => {
         audioWorklet.stop(audio);
-      }, fadeDuration * 2, pointers[e.pointerId].audio);
+      }, fadeDuration * 2 * 1000, pointers[e.pointerId].audio);
       delete pointers[e.pointerId];
       drawFg();
     }
@@ -219,4 +219,3 @@ function drawFg() {
 
 drawBg();
 // #endregion
-
