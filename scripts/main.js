@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "b37b0fdf-cd3a-4cf7-a4ab-440212727a7b"), { once: true });
+setTimeout(() => alert("version:\n" + "3aa5a77c-9d56-4b72-8c58-e523efa04f7d"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
