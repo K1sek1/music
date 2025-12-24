@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "0d39e698-8d83-4863-93bf-91dd8b53fc0d"), { once: true });
+addEventListener("load", () => alert("version:\n" + "72a2363e-ba3d-4e44-8197-1e21d5cd8802"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -219,3 +219,4 @@ function drawFg() {
 
 drawBg();
 // #endregion
+
