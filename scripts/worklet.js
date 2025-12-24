@@ -3,30 +3,32 @@
 const MAX_HARMONICS = 8;
 const STANDARD_PITCH = 440;
 
-const TABLE_SIZE = 1 << 11;         // 2048 = 2^11
-const TABLE_MASK = TABLE_SIZE - 1;  // 2047
+/** 高速サイン近似（5次 minimax） */
+function fastSin01(p) {
+  // wrap to [0,4)
+  let t = p - (p | 0);
+  t *= 4.0;
 
-const sinTable = new Float32Array(TABLE_SIZE);
-for (let i = 0; i < TABLE_SIZE; i++) {
-  sinTable[i] = Math.sin((i / TABLE_SIZE) * 2 * Math.PI);
-}
+  const q = t | 0;      // quadrant
+  let x = t - q;        // [0,1)
 
-/** Hermite 補間（Catmull–Rom 型 4点補間） */
-function hermite(table, idx) {
-  const i0 = idx | 0;
-  const frac = idx - i0;
+  // fold using sin symmetry
+  x = x > 0.5 ? 1.0 - x : x;
 
-  const xm1 = table[(i0 - 1) & TABLE_MASK];
-  const x0  = table[i0 & TABLE_MASK];
-  const x1  = table[(i0 + 1) & TABLE_MASK];
-  const x2  = table[(i0 + 2) & TABLE_MASK];
+  // scale to [0,0.25]
+  x *= 0.5;
 
-  const c0 = x0;
-  const c1 = 0.5 * (x1 - xm1);
-  const c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2;
-  const c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+  const x2 = x * x;
 
-  return ((c3 * frac + c2) * frac + c1) * frac + c0;
+  // 5th-order minimax polynomial for sin(2πx)
+  let y = x * (6.283185307179586 +
+              x2 * (-41.341702240396 +
+              x2 *  81.605249276673));
+
+  // sin quadrant sign: + + - -
+  if (q & 2) y = -y;
+
+  return y;
 }
 
 // 元の倍音構造（例：1/n ロールオフ）
@@ -97,7 +99,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
 
         let p = this.phase[n - 1];
-        sample += amp * hermite(sinTable, p * TABLE_SIZE);
+        sample += amp * fastSin01(p);
         
         p += freqN * dt;
         if (p >= 1) p -= 1;
@@ -112,4 +114,3 @@ class HarmonicOsc extends AudioWorkletProcessor {
 }
 
 registerProcessor("harmonic-osc", HarmonicOsc);
-
