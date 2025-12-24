@@ -11,6 +11,24 @@ for (let i = 0; i < TABLE_SIZE; i++) {
   sinTable[i] = Math.sin((i / TABLE_SIZE) * 2 * Math.PI);
 }
 
+/** Hermite 補間（Catmull–Rom 型 4点補間） */
+function hermite(table, idx) {
+  const i0 = idx | 0;
+  const frac = idx - i0;
+
+  const xm1 = table[(i0 - 1) & TABLE_MASK];
+  const x0  = table[i0 & TABLE_MASK];
+  const x1  = table[(i0 + 1) & TABLE_MASK];
+  const x2  = table[(i0 + 2) & TABLE_MASK];
+
+  const c0 = x0;
+  const c1 = 0.5 * (x1 - xm1);
+  const c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2;
+  const c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+
+  return ((c3 * frac + c2) * frac + c1) * frac + c0;
+}
+
 // 元の倍音構造（例：1/n ロールオフ）
 const baseAmp = new Float32Array(MAX_HARMONICS);
 for (let n = 1; n <= MAX_HARMONICS; ++n) {
@@ -79,7 +97,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
 
         let p = this.phase[n - 1];
-        sample += amp * sinTable[(p * TABLE_SIZE | 0) & TABLE_MASK];
+        sample += amp * hermite(sinTable, p * TABLE_SIZE);
         
         p += freqN * dt;
         if (p >= 1) p -= 1;
