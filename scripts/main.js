@@ -1,6 +1,6 @@
 "use strict";
 
-addEventListener("load", () => alert("version:\n" + "25bdb653-4b95-4223-a04e-d002159bf353"), { once: true });
+addEventListener("load", () => alert("version:\n" + "d80436e3-4903-48cb-a406-c074d97ce213"), { once: true });
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -15,15 +15,6 @@ const RANGE = 36;
 
 const fadeDuration = 1 / 60;
 
-/**
- * 
- * @param {number} frequency Hz
- * @returns {number} gain 0-1を返す想定だが保証はしない
- */
-function getGainFromFrequency(frequency) {
-  return (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / frequency) ** 1
-}
-
 
 
 // {
@@ -33,30 +24,50 @@ function getGainFromFrequency(frequency) {
 //   "portrait-primary": pointers[e.pointerId].pos.x
 // }[screen.orientation.type] ?? console.log("このブラウザーは画面方向 API に対応していません")
 
-const audioCtx = new AudioContext();
 
-addEventListener("pointerup", () => {
-  document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
-    /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
-  });
-}, { once: true });
-/** @type {{ [key: number]: { pos: { x: number, y: number }, audio: { osc: OscillatorNode, gain: GainNode } } }} */
-const pointers = {}; {
+
+// AudioContext 準備
+const audioCtx = new AudioContext();
+const audioWorklet = {
+  create() {
+    return new AudioWorkletNode(audioCtx, "harmonic-osc", {
+      processorOptions: {
+        lowerLimit: LOWER_LIMIT
+      },
+      parameterData: {
+        gain: 0
+      }
+    })
+  },
+  moduleURL: "scripts/worklet.js",
+  /**
+   * ノードを切断し、停止を命令します。
+   * @param {AudioWorkletNode} node 対称のノード
+   */
+  stop(node) {
+    node.disconnect();
+    node.port.postMessage({ type: "stop" });
+  }
+}
+
+
+
+// addEventListener("pointerup", () => {
+//   document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(() => {
+//     /*if (document.fullscreenElement) */screen.orientation.lock("portrait-primary").catch(() => {});
+//   });
+// }, { once: true });
+/** @type {{ [key: number]: { pos: [number, number], audio: AudioWorkletNode } }} */
+const pointers = {};
+audioCtx.audioWorklet.addModule(audioWorklet.moduleURL).then(() => {
   addEventListener("pointerdown", e => {
     if (e.button === 0) {
       pointers[e.pointerId] = {
         pos: pointerPos(e),
-        audio: {
-          osc: new OscillatorNode(audioCtx),
-          gain: new GainNode(audioCtx, { gain: 0 })
-        }
+        audio: audioWorklet.create()
       };
       setAudio(e, true);
-      pointers[e.pointerId].audio.osc
-        .connect(pointers[e.pointerId].audio.gain)
-        .connect(audioCtx.destination)
-      ;
-      pointers[e.pointerId].audio.osc.start();
+      pointers[e.pointerId].audio.connect(audioCtx.destination);
       drawFg();
     }
   });
@@ -72,34 +83,37 @@ const pointers = {}; {
   /** @param {PointerEvent} e */
   function pointerEnd(e) {
     if (e.button === 0) {
-      pointers[e.pointerId].audio.gain.gain
+      pointers[e.pointerId].audio.parameters.get("gain")
         .cancelScheduledValues(audioCtx.currentTime)
-        .setValueAtTime(pointers[e.pointerId].audio.gain.gain.value, audioCtx.currentTime)
+        .setValueAtTime(pointers[e.pointerId].audio.parameters.get("gain").value, audioCtx.currentTime)
         .linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration)
       ;
-      pointers[e.pointerId].audio.osc.stop(audioCtx.currentTime + fadeDuration * 2);
+      setTimeout(audio => {
+        audioWorklet.stop(audio);
+      }, fadeDuration * 2, pointers[e.pointerId].audio);
       delete pointers[e.pointerId];
       drawFg();
     }
   }
   /** @param {PointerEvent} e */
   function pointerPos(e) {
-    return {
-      x: e.pageX / document.documentElement.scrollWidth,
-      y: e.pageY / document.documentElement.scrollHeight
-    };
+    return [
+      e.x / visualViewport.width,
+      e.y / visualViewport.height
+    ];
   }
   /** @param {PointerEvent} e */
   function setAudio(e, isInit = false) {
-    const newFrequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos.y);
-    const nextBlockTime = (Math.floor(audioCtx.currentTime / (128 / audioCtx.sampleRate)) + 1) * (128 / audioCtx.sampleRate)
+    const frequencyParam = pointers[e.pointerId].audio.parameters.get("frequency")
+    const gainParam = pointers[e.pointerId].audio.parameters.get("gain")
+    const newFrequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos[1]);
 
     if (isInit) {
-      pointers[e.pointerId].audio.osc.frequency.value = newFrequency
+      frequencyParam.value = newFrequency
     } else {
-      pointers[e.pointerId].audio.osc.frequency
+      frequencyParam
         .cancelScheduledValues(audioCtx.currentTime)
-        .setValueAtTime(pointers[e.pointerId].audio.osc.frequency.value, audioCtx.currentTime)
+        .setValueAtTime(frequencyParam.value, audioCtx.currentTime)
         .linearRampToValueAtTime(
           newFrequency,
           audioCtx.currentTime + fadeDuration
@@ -107,112 +121,30 @@ const pointers = {}; {
       ;
     }
 
-    pointers[e.pointerId].audio.osc.setPeriodicWave((() => {
-      /** 倍音数 */
-      const harmonics = Math.floor(audioCtx.sampleRate / 2 / newFrequency) - 1;
-
-      const real = new Float32Array(harmonics);
-      const imag = new Float32Array(harmonics);
-
-      for (let i = 1; i < harmonics; i++) {
-        // 振幅
-        imag[i] = i ** -2 * getGainFromFrequency(newFrequency * i);
-
-        // imag[i] = ((n, C, p, q, k, s) =>
-        //   C * n ** -p *
-        //   ((1 + (n / k) ** s) ** -((q - p) / s))
-
-        //   * (STANDARD_PITCH * SEMITONE ** LOWER_LIMIT / (frequency * n)) ** (1 / 1)
-        // )(i, 1, 2, 1, 1, 1);
-
-        // 位相
-        real[i] = 0;
-      }
-
-      // console.log(imag);
-      return audioCtx.createPeriodicWave(real, imag, { disableNormalization: true });
-    })());
-
-    /*
-    0->0, 1->0.5, ∞->1
-    y = x / (1 + x)
-
-    0->0, 1->1, ∞->2
-    y = 2x / (1 + x)
-
-    y = 2x / (1 + x); x
-    x = y / (2 - y)
-      = 1 / ((2 / y) - 1)
-    */
-    pointers[e.pointerId].audio.gain.gain
+    gainParam
       .cancelScheduledValues(audioCtx.currentTime)
       .setValueAtTime(
-        pointers[e.pointerId].audio.gain.gain.value
-          * getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value)
-          / getGainFromFrequency(newFrequency)
-        ,
+        gainParam.value,
         audioCtx.currentTime
       )
       .linearRampToValueAtTime(
-        pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5,
-        audioCtx.currentTime + fadeDuration
-      )
-    ;
-
-    // const oldGain = pointers[e.pointerId].audio.gain.gain.value;
-    // const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
-    // const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
-    // const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
-    // const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
+        /*
+        0->0, 1->0.5, ∞->1
+        y = x / (1 + x)
     
-    // pointers[e.pointerId].audio.gain.gain
-    //   .cancelScheduledValues(audioCtx.currentTime)
-    //   .setValueAtTime(
-    //     oldGain,
-    //     audioCtx.currentTime
-    //   )
-    //   .linearRampToValueAtTime(
-    //     oldGain * r2 + targetGain * gainRatio * r1,
-    //     nextBlockTime - 128 / audioCtx.sampleRate
-    //   )
-    //   .setValueAtTime(
-    //     oldGain / gainRatio * r2 + targetGain * r1,
-    //     nextBlockTime
-    //   )
-    //   .linearRampToValueAtTime(
-    //     targetGain,
-    //     audioCtx.currentTime + fadeDuration
-    //   )
-    // ;
-    const oldGain = pointers[e.pointerId].audio.gain.gain.value;
-    const targetGain = pointers[e.pointerId].pos.x / (2 - pointers[e.pointerId].pos.x) * 0.5;
-    const gainRatio = getGainFromFrequency(newFrequency) / getGainFromFrequency(pointers[e.pointerId].audio.osc.frequency.value);
-    const r1 = (nextBlockTime - audioCtx.currentTime) / fadeDuration;
-    const r2 = (audioCtx.currentTime + fadeDuration - nextBlockTime) / fadeDuration;
-    const r3 = ((nextBlockTime - 128 / audioCtx.sampleRate) - audioCtx.currentTime) / fadeDuration;
-    const r4 = (audioCtx.currentTime + fadeDuration - (nextBlockTime - 128 / audioCtx.sampleRate)) / fadeDuration;
+        0->0, 1->1, ∞->2
+        y = 2x / (1 + x)
     
-    pointers[e.pointerId].audio.gain.gain
-      .cancelScheduledValues(audioCtx.currentTime)
-      .setValueAtTime(
-        oldGain,
-        audioCtx.currentTime
-      )
-      .linearRampToValueAtTime(
-        oldGain * r4 + targetGain * gainRatio * r3,
-        nextBlockTime - 128 / audioCtx.sampleRate
-      )
-      .setValueAtTime(
-        oldGain / gainRatio * r2 + targetGain * r1,
-        nextBlockTime
-      )
-      .linearRampToValueAtTime(
-        targetGain,
+        y = 2x / (1 + x); x
+        x = y / (2 - y)
+          = 1 / ((2 / y) - 1)
+        */
+        1 / ((2 / pointers[e.pointerId].pos[0]) - 1) * 0.5,
         audioCtx.currentTime + fadeDuration
       )
     ;
   }
-}
+});
 
 
 
@@ -223,9 +155,6 @@ const fg = document.createElement('canvas');
 
 const bgCtx = bg.getContext('2d');
 const fgCtx = fg.getContext('2d');
-
-const w = document.body.scrollWidth;
-const h = document.body.scrollHeight;
 
 Object.assign(bg.style, { position: "absolute" });
 Object.assign(fg.style, { position: "absolute" });
@@ -280,7 +209,7 @@ function drawFg() {
   fgCtx.strokeStyle = "red";
   fgCtx.lineWidth = 1;
   Object.values(pointers).forEach(pointer => {
-    const y = pointer.pos.y * h;
+    const y = pointer.pos[1] * h;
     fgCtx.moveTo(0, y);
     fgCtx.lineTo(w, y);
   });
