@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_HARMONICS = 2;
+const MAX_HARMONICS = 8;
 const STANDARD_PITCH = 440;
 
 const TABLE_SIZE = 1 << 11;         // 2048 = 2^11
@@ -79,7 +79,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
 
         let p = this.phase[n - 1];
-        sample += amp * sinTable[(p * TABLE_SIZE) & TABLE_MASK];
+        sample += amp * sinTable[(p * TABLE_SIZE | 0) & TABLE_MASK];
         
         p += freqN * dt;
         if (p >= 1) p -= 1;
