@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "c6e92ad6-fb52-459f-8caf-d93f1e8c39ac"));
+setTimeout(() => alert("version:\n" + "8b32303c-6506-44dc-9745-db889a9499e0"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -219,4 +219,5 @@ function drawFg() {
 
 drawBg();
 // #endregion
+
 
