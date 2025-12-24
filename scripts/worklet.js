@@ -1,6 +1,15 @@
 "use strict";
-const MAX_HARMONICS = 128;
+
+const MAX_HARMONICS = 64;
 const STANDARD_PITCH = 440;
+
+const TABLE_SIZE = 1 << 11;         // 2048 = 2^11
+const TABLE_MASK = TABLE_SIZE - 1;  // 2047
+
+const sinTable = new Float32Array(TABLE_SIZE);
+for (let i = 0; i < TABLE_SIZE; i++) {
+  sinTable[i] = Math.sin((i / TABLE_SIZE) * 2 * Math.PI);
+}
 
 // 元の倍音構造（例：1/n ロールオフ）
 const baseAmp = new Float32Array(MAX_HARMONICS);
@@ -69,13 +78,13 @@ class HarmonicOsc extends AudioWorkletProcessor {
 
         const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
 
-        sample += amp * Math.sin(this.phase[n - 1]);
-
-        this.phase[n - 1] += freqN * dt * 2 * Math.PI;
-        if (this.phase[n - 1] > Math.PI * 2) {
-          this.phase[n - 1] -= Math.PI * 2;
-        }
-      }
+        let p = this.phase[n - 1];
+        sample += amp * sinTable[(p * TABLE_SIZE) & TABLE_MASK];
+        
+        p += freqN * dt;
+        if (p >= 1) p -= 1;
+        this.phase[n - 1] = p;        
+      }      
 
       out[i] = sample * g0;
     }
