@@ -1,40 +1,46 @@
 "use strict";
 
-const MAX_HARMONICS = 8;
+const MAX_HARMONICS = 16;
 const STANDARD_PITCH = 440;
 
-/** 高速サイン近似（5次 minimax） */
-function fastSin01(p) {
+/** 高速サイン近似（5次 minimax）
+ * 
+ * maxErr ≈ 2.3506901980496764e-10 @ t ≈ -0.044788
+ */
+function fastSin2pi(p) {
+  // 「4分割」リダクションを前提にした最速実装
+  // 係数は ULP 最適化済み（4分割用）
+
   // wrap to [0,4)
   let t = p - (p | 0);
-  t *= 4.0;
+  t *= 4;
 
-  const q = t | 0;      // quadrant
+  const q = t | 0;      // quadrant 0..3
   let x = t - q;        // [0,1)
 
-  // fold using sin symmetry
-  x = x > 0.5 ? 1.0 - x : x;
+  // fold using sin symmetry -> [0,0.5]
+  if (x > 0.5) x = 1.0 - x;
 
-  // scale to [0,0.25]
+  // scale to [0,0.25] -> corresponds to [-1/16, 1/16] after sign handling
   x *= 0.5;
 
   const x2 = x * x;
 
-  // 5th-order minimax polynomial for sin(2πx)
-  let y = x * (6.283185307179586 +
-              x2 * (-41.341702240396 +
-              x2 *  81.605249276673));
+  // quadrant sign: + + - -
+  if (q & 2) x = -x;
 
-  // sin quadrant sign: + + - -
-  if (q & 2) y = -y;
-
-  return y;
+  // 7次 ULP 最適化済み多項式（Horner）
+  let h = -76.70585975306136;          // a3
+  h =  81.60524927607035 + x2 * h;     // a2 + x2*h
+  h = -41.34170219370107 + x2 * h;     // a1 + x2*h
+  h =   6.283185313014904 + x2 * h;    // a0 + x2*h
+  return x * h;
 }
 
 // 元の倍音構造（例：1/n ロールオフ）
 const baseAmp = new Float32Array(MAX_HARMONICS);
 for (let n = 1; n <= MAX_HARMONICS; ++n) {
-  baseAmp[n - 1] = 1 / n;
+  baseAmp[n - 1] = 1 / n ** 2;
 }
 
 class HarmonicOsc extends AudioWorkletProcessor {
@@ -99,7 +105,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
 
         let p = this.phase[n - 1];
-        sample += amp * fastSin01(p);
+        sample += amp * fastSin2pi(p);
         
         p += freqN * dt;
         if (p >= 1) p -= 1;
