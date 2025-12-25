@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_HARMONICS = 16;
+const MAX_HARMONICS = 8;
 const STANDARD_PITCH = 440;
 
 /** 高速サイン近似（5次 minimax）
@@ -120,3 +120,4 @@ class HarmonicOsc extends AudioWorkletProcessor {
 }
 
 registerProcessor("harmonic-osc", HarmonicOsc);
+
