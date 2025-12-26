@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "2cca6fcc-1331-4260-8aa8-ee281cdfc36e"));
+setTimeout(() => alert("version:\n" + "f9a418fd-180f-47d2-b946-56f8c424135f"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -118,46 +118,106 @@ addEventListener("pointerup", () => {
 /**
  * @type {{
  *   [pointerId: number]: {
+ *     fixedId: number
  *     pos: [number, number],
- *     voiceId: number
+ *     event: string | null
  *   }
  * }}
  */
 const pointers = {};
 audioWorklet.init().then(() => {
-  addEventListener("pointerdown", e => {
-    if (e.button !== 0) return;
-    const pos = pointerPos(e);
-    const voiceId = audioWorklet.allocVoiceId();
-    pointers[e.pointerId] = { pos, voiceId };
-    audioWorklet.addVoice(voiceId, {
-      frequency: calcFrequency(pos[1]),
-      gain: calcGain(pos[0])
-    });
-    drawFg();
+  const POINTER_EVENT = Object.freeze({
+    none: 0,
+    start: 1,
+    move: 2,
+    end: 3
   });
+  addEventListener("pointerdown", (() => {
+    const allocateFixedId = (() => {
+      let nextFixedId = 0;
+      return () => nextFixedId++;
+    })();
+    return (e => {
+      if (e.button) return;
+      pointers[e.pointerId] = {
+        fixedId: allocateFixedId(),
+        event: POINTER_EVENT.start,
+        pos: pointerPos(e)
+      };
+    })
+  })());
   addEventListener("pointermove", e => {
     const pointer = pointers[e.pointerId];
     if (!pointer) return;
+    if (pointer.event === POINTER_EVENT.none) pointer.event = POINTER_EVENT.move;
     pointer.pos = pointerPos(e);
-    audioWorklet.updateVoice(pointer.voiceId, {
-      frequency: calcFrequency(pointer.pos[1]),
-      gain: calcGain(pointer.pos[0])
-    });
-    drawFg();
   });
-  addEventListener("pointerup", pointerEnd);
-  addEventListener("pointercancel", pointerEnd);
-  /** @param {PointerEvent} e */
-  function pointerEnd(e) {
-    // if (e.button !== 0) return;
-    const pointer = pointers[e.pointerId];
-    if (!pointer) return;
-
-    audioWorklet.removeVoice(pointer.voiceId);
-    delete pointers[e.pointerId]
-    drawFg();
+  /* pointerEnd */ {
+    addEventListener("pointerup", pointerEnd);
+    addEventListener("pointercancel", pointerEnd);
+    /** @param {PointerEvent} e */
+    function pointerEnd(e) {
+      const pointer = pointers[e.pointerId];
+      if (!pointer) return;
+      if (pointer.event === POINTER_EVENT.start) {
+        pointer.event = POINTER_EVENT.none;
+      } else {
+        pointer.event = POINTER_EVENT.end;
+      }
+      pointer.pos = pointerPos(e);
+    }
   }
+  requestAnimationFrame(function frameRequestCallback() {
+    /**
+     * @type {{
+     *   [voiceId: number]: {
+     *     type: number,
+     *     frequency: number,
+     *     gain: number
+     *   }
+     * }}
+     */
+    const msg = {};
+    let hasMsg = false;
+    for (const pointerId in pointers) {
+      const pointer = pointers[pointerId];
+      if (!pointer) continue;
+      switch (pointer.event) {
+        case POINTER_EVENT.none:
+          continue;
+        case POINTER_EVENT.start:
+          msg[pointer.fixedId] = {
+            type: 0,
+            frequency: calcFrequency(pointer.pos[1]),
+            gain: calcGain(pointer.pos[0])
+          };
+          break;
+        case POINTER_EVENT.move:
+          msg[pointer.fixedId] = {
+            type: 1,
+            frequency: calcFrequency(pointer.pos[1]),
+            gain: calcGain(pointer.pos[0])
+          };
+          break;
+        case POINTER_EVENT.end:
+          msg[pointer.fixedId] = {
+            type: 2,
+            frequency: 0,
+            gain: 0
+          };
+          delete pointers[pointerId];
+          break;
+      }
+      pointer.event = POINTER_EVENT.none;
+      hasMsg = true;
+    }
+    if (hasMsg) {
+      audioWorklet.node.port.postMessage(msg);
+      drawFg();
+    }
+
+    requestAnimationFrame(frameRequestCallback);
+  });
   /** @param {PointerEvent} e */
   function pointerPos(e) {
     return [
@@ -256,4 +316,3 @@ function drawFg() {
 
 drawBg();
 // #endregion
-
