@@ -3,7 +3,14 @@
 const MAX_HARMONICS = 8;
 const STANDARD_PITCH = 440;
 
-/** 高速サイン近似（5次 minimax）
+/** 1フレーム当たりのfade割合 */
+// 1 / fadeFrames
+// fadeDuration = (fadeに掛ける時間 (秒))
+// fadeFrames   = (fadeに掛けるフレーム数)
+//              = fadeDuration * sampleRate
+const fadeRatio = 1 / (1 / 60 * sampleRate);
+
+/** 高速サイン近似（7次 minimax）
  * 
  * maxErr ≈ 2.3506901980496764e-10 @ t ≈ -0.044788
  */
@@ -19,7 +26,7 @@ function fastSin2pi(p) {
   let x = t - q;        // [0,1)
 
   // fold using sin symmetry -> [0,0.5]
-  if (x > 0.5) x = 1.0 - x;
+  if (x > 0.5) x = 1 - x;
 
   // scale to [0,0.25] -> corresponds to [-1/16, 1/16] after sign handling
   x *= 0.5;
@@ -37,42 +44,74 @@ function fastSin2pi(p) {
   return x * h;
 }
 
-// 元の倍音構造（例：1/n ロールオフ）
+/** 元の倍音構造 */
 const baseAmp = new Float32Array(MAX_HARMONICS);
 for (let n = 1; n <= MAX_HARMONICS; ++n) {
   baseAmp[n - 1] = 1 / n ** 2;
 }
 
-class HarmonicOsc extends AudioWorkletProcessor {
-  static get parameterDescriptors() {
-    return [
-      { name: "frequency", defaultValue: 440 },
-      { name: "gain", defaultValue: 1 }
-    ];
-  }
+const dt = 1 / sampleRate;
+const nyquist = sampleRate / 2;
 
+class HarmonicOsc extends AudioWorkletProcessor {
   constructor(options) {
     super();
 
-    this.running = true;
+    /**
+     * @type {{
+     *   [id: number]: {
+     *     frequency: number,
+     *     gain: number,
+     *     targetFrequency: number,
+     *     targetGain: number,
+     *     phase: Float32Array,
+     *     stopped: boolean
+     *   }
+     * }}
+     */
+    this.voices = {};
 
     /** Hz */
     this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
 
-    /** 位相配列（固定長） */
-    this.phase = new Float32Array(MAX_HARMONICS);
-
+    /**
+     * @param {{
+     *   data: {
+     *     type: string,
+     *     id?: number,
+     *     frequency?: number,
+     *     gain?: number
+     *   }
+     * }} e
+     */
     this.port.onmessage = e => {
+      /** @type {number} */
+      if (this.voices[e.data.id]?.stopped) throw new Error("停止が命令された voice に、変更が加えられようとしています。");
       switch (e.data.type) {
-        case "stop":
-          this.running = false
+        case "add":
+          this.voices[e.data.id] = {
+            frequency: e.data.frequency,
+            gain: 0,
+            targetFrequency: e.data.frequency,
+            targetGain: e.data.gain,
+            /** 位相配列（固定長） */
+            phase: new Float32Array(MAX_HARMONICS),
+            stopped: false
+          }
+          break;
+        case "update":
+          if (e.data.frequency != null) this.voices[e.data.id].targetFrequency = e.data.frequency;
+          if (e.data.gain != null) this.voices[e.data.id].targetGain = e.data.gain;
+          break;
+        case "remove":
+          this.voices[e.data.id].targetGain = 0;
+          this.voices[e.data.id].stopped = true;
           break;
       }
     }
   }
 
   /**
-   * 
    * @param {number} frequency Hz
    * @returns gain
    */
@@ -82,37 +121,79 @@ class HarmonicOsc extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, parameters) {
-    if (!this.running) return false;
     const out = outputs[0][0];
 
-    const freqParam = parameters.frequency;
-    const gainParam = parameters.gain;
+    const ids = Object.keys(this.voices);
 
-    const dt = 1 / sampleRate;
-    const nyquist = sampleRate / 2;
-
-    for (let i = 0; i < out.length; i++) {
-      const f0 = freqParam.length > 1 ? freqParam[i] : freqParam[0];
-      const g0 = gainParam.length > 1 ? gainParam[i] : gainParam[0];
-
+    const ol = out.length;
+    const il = ids.length;
+    for (let i = 0; i < ol; i++) {
       let sample = 0;
 
-      // 固定長ループ（リアルタイム最適）
-      for (let n = 1; n <= MAX_HARMONICS; n++) {
-        const freqN = f0 * n;
-        if (freqN > nyquist) break;
+      for (let j = 0; j < il; j++) {
+        const id = ids[j];
+        const voice = this.voices[/** @type {number} */(id)];
+        // 同ブロック内でvoiceが削除されていた場合
+        if (!voice) continue;
+        let f0 = voice.frequency;
+        let g0 = voice.gain;
 
-        const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
+        // ---- frequency / gain の線形スムージング ----
+        // target まで fade して追いつく想定（target が動いても毎サンプル再計算）
+        /* frequency */ {
+          const tf = voice.targetFrequency;
+          const df = tf - f0;
+          if (df !== 0) {
+            const step = df * fadeRatio;
+            // 数値誤差で振動しないように閾値でスナップ
+            f0 =
+              df * df <= step * step
+                ? tf
+                : f0 + step
+            ;
+            voice.frequency = f0;
+          }
+        }
+        /* gain */ {
+          const tg = voice.targetGain
+          const dg = tg - g0;
+          if (dg !== 0) {
+            const step = dg * fadeRatio;
+            if (dg * dg <= step * step) {
+              g0 = tg;
+              if (tg === 0 && voice.stopped) {
+                delete this.voices[id];
+                continue;
+              }
+            } else {
+              g0 += step;
+            }
+            voice.gain = g0;
+          }
+        }
 
-        let p = this.phase[n - 1];
-        sample += amp * fastSin2pi(p);
-        
-        p += freqN * dt;
-        if (p >= 1) p -= 1;
-        this.phase[n - 1] = p;        
-      }      
+        const phase = voice.phase;
+        let voiceSample = 0;
 
-      out[i] = sample * g0;
+        // 倍音合成
+        for (let n = 1; n <= MAX_HARMONICS; n++) {
+          const freqN = f0 * n;
+          if (freqN > nyquist) break;
+
+          const amp = baseAmp[n - 1] * this.getGainFromFrequency(freqN);
+          let p = phase[n - 1];
+
+          voiceSample += amp * fastSin2pi(p);
+
+          p += freqN * dt;
+          p -= p | 0; // wrap to [0,1)
+          phase[n - 1] = p;
+        }
+
+        sample += voiceSample * g0;
+      }
+
+      out[i] = sample;
     }
 
     return true;
@@ -120,4 +201,3 @@ class HarmonicOsc extends AudioWorkletProcessor {
 }
 
 registerProcessor("harmonic-osc", HarmonicOsc);
-
