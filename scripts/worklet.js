@@ -1,4 +1,4 @@
-"use strict";
+"use strict"; 
 
 const MAX_HARMONICS = 8;
 const STANDARD_PITCH = 440;
@@ -201,3 +201,4 @@ class HarmonicOsc extends AudioWorkletProcessor {
 }
 
 registerProcessor("harmonic-osc", HarmonicOsc);
+
