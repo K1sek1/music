@@ -58,80 +58,18 @@ class HarmonicOsc extends AudioWorkletProcessor {
     super();
 
     /**
-     * @typedef {Object} Voice
-     * @property {number} frequency
-     * @property {number} gain
-     * @property {number} targetFrequency
-     * @property {number} targetGain
-     * @property {Float32Array} phase 位相配列 (固定長)
-     * @property {boolean} stopped
+     * @type {{
+     *   [id: number]: {
+     *     frequency: number,
+     *     gain: number,
+     *     targetFrequency: number,
+     *     targetGain: number,
+     *     phase: Float32Array,
+     *     stopped: boolean
+     *   }
+     * }}
      */
-    /**
-     * Voice の状態オブジェクトを生成するファクトリ関数。
-     * 
-     * class を使わず、純粋なオブジェクトとして返すことで
-     * メモリ効率と GC 安定性を最大化する。
-     *
-     * @returns {Voice}
-     */
-    function Voice() {
-      return {
-        frequency: 0,
-        gain: 0,
-        targetFrequency: 0,
-        targetGain: 0,
-        phase: new Float32Array(MAX_HARMONICS),
-        stopped: false
-      };
-    }
-    /**
-     * voiceId と Voice 実体を紐付けるための参照テーブル。
-     *
-     * - キー: voiceId（非負整数文字列）
-     * - 値: Voice の実体
-     *
-     * このテーブルは「参照の解決」を担当し、実体のライフサイクル管理は行わない。
-     * 実体の保持・再利用は voicePool が担当する。
-     * @type {{ [voiceId: string]: Voice }}
-     */
-    this.voiceTable = {};
-    /**
-     * Voice 実体を保持するためのプール。
-     *
-     * - 生成済みの Voice インスタンスを格納する
-     * - 再利用することで GC の揺らぎを抑える
-     * - 実体のライフサイクル（貸し出し・返却）を管理する
-     *
-     * voiceTable が「id → 実体の紐付け」を担当するのに対し、
-     * このプールは「実体そのものの保持・再利用」を担当する。
-     * @type {Voice[]}
-     */
-    this.voicePool = (() => {
-      const pool = [];
-      for (let i = 0; i < 2; i++) {
-        pool.push(Voice());
-      }
-      return pool;
-    })();
-    /**
-     * @param {number} frequency
-     * @param {number} gain
-     */
-    const acquireVoice = (frequency, gain) => {
-      let voice = this.voicePool.pop();
-      if (voice) {
-        voice.targetFrequency = frequency;
-        voice.targetGain = gain;
-        voice.stopped = false;
-        voice.phase.fill(0);
-      } else {
-        voice = Voice();
-      }
-      voice.frequency = frequency;
-      voice.gain = 0;
-      return voice;
-    };
-    
+    this.voices = {};
 
     /** Hz */
     this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
@@ -139,30 +77,36 @@ class HarmonicOsc extends AudioWorkletProcessor {
     /**
      * @param {{
      *   data: {
-     *     [id: number]: {
-     *       type: number,
-     *       frequency: number,
-     *       gain: number
-     *     }
+     *     type: string,
+     *     id?: number,
+     *     frequency?: number,
+     *     gain?: number
      *   }
      * }} e
      */
     this.port.onmessage = e => {
-      for (const [id, { type, frequency, gain }] of Object.entries(e.data)) {
-        if (this.voiceTable[id]?.stopped) throw new Error("停止が命令された voice に、変更が加えられようとしています。");
-        switch (type) {
-          case 0:
-            this.voiceTable[id] = acquireVoice(frequency, gain)
-            break;
-          case 1:
-            this.voiceTable[id].targetFrequency = frequency;
-            this.voiceTable[id].targetGain = gain;
-            break;
-          case 2:
-            this.voiceTable[id].targetGain = 0;
-            this.voiceTable[id].stopped = true;
-            break;
-        }
+      /** @type {number} */
+      if (this.voices[e.data.id]?.stopped) throw new Error("停止が命令された voice に、変更が加えられようとしています。");
+      switch (e.data.type) {
+        case "add":
+          this.voices[e.data.id] = {
+            frequency: e.data.frequency,
+            gain: 0,
+            targetFrequency: e.data.frequency,
+            targetGain: e.data.gain,
+            /** 位相配列（固定長） */
+            phase: new Float32Array(MAX_HARMONICS),
+            stopped: false
+          }
+          break;
+        case "update":
+          if (e.data.frequency != null) this.voices[e.data.id].targetFrequency = e.data.frequency;
+          if (e.data.gain != null) this.voices[e.data.id].targetGain = e.data.gain;
+          break;
+        case "remove":
+          this.voices[e.data.id].targetGain = 0;
+          this.voices[e.data.id].stopped = true;
+          break;
       }
     }
   }
@@ -179,7 +123,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
   process(inputs, outputs, parameters) {
     const out = outputs[0][0];
 
-    const ids = Object.keys(this.voiceTable);
+    const ids = Object.keys(this.voices);
 
     const ol = out.length;
     const il = ids.length;
@@ -188,7 +132,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
 
       for (let j = 0; j < il; j++) {
         const id = ids[j];
-        const voice = this.voiceTable[/** @type {number} */(id)];
+        const voice = this.voices[/** @type {number} */(id)];
         // 同ブロック内でvoiceが削除されていた場合
         if (!voice) continue;
         let f0 = voice.frequency;
@@ -218,8 +162,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
             if (dg * dg <= step * step) {
               g0 = tg;
               if (tg === 0 && voice.stopped) {
-                this.voicePool.push(voice);
-                delete this.voiceTable[id];
+                delete this.voices[id];
                 continue;
               }
             } else {
