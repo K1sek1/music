@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "9fb20ccc-a22c-43b1-be3f-5d488bf4cda2"));
+setTimeout(() => alert("version:\n" + "2cca6fcc-1331-4260-8aa8-ee281cdfc36d"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -12,8 +12,6 @@ const SEMITONE = 2 ** (1 / 12);
 const LOWER_LIMIT = -21;
 const RANGE = 36;
 // const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
-
-const fadeDuration = 1 / 60;
 
 
 
@@ -29,25 +27,81 @@ const fadeDuration = 1 / 60;
 // AudioContext 準備
 const audioCtx = new AudioContext();
 const audioWorklet = {
-  create() {
-    return new AudioWorkletNode(audioCtx, "harmonic-osc", {
-      processorOptions: {
-        lowerLimit: LOWER_LIMIT
-      },
-      parameterData: {
-        gain: 0
-      }
-    })
+  /** @type {AudioWorkletNode | undefined} */
+  node: undefined,
+  /** 初期化 & 単一ノード生成 */
+  async init() {
+    if (!this.node) {
+      await audioCtx.audioWorklet.addModule("scripts/worklet.js");
+      this.node = new AudioWorkletNode(audioCtx, "harmonic-osc", {
+        processorOptions: {
+          lowerLimit: LOWER_LIMIT
+        }
+      });
+      this.node.connect(audioCtx.destination);
+
+      // 任意: Worklet からのログ受信用
+      this.node.port.onmessage = e => {
+        if (e.data?.type === "log") {
+          console.log("[worklet]", e.data.msg);
+        }
+      };
+    }
   },
-  moduleURL: "scripts/worklet.js",
   /**
-   * ノードを切断し、停止を命令します。
-   * @param {AudioWorkletNode} node 対称のノード
+   * voice 追加
+   * 
+   * (フェードインは Worklet 側で自動)
+   * @param {number} id
+   * @param {{ frequency: number, gain: number }}
    */
-  stop(node) {
-    node.disconnect();
-    node.port.postMessage({ type: "stop" });
-  }
+  addVoice(id, { frequency, gain }) {
+    this.node.port.postMessage({
+      type: "add",
+      id,
+      frequency,
+      gain
+    });
+  },
+  /**
+   * voice 更新
+   * 
+   * (frequency/gain どちらか片方だけでも可)
+   * @param {number} id
+   * @param {{ frequency?: number, gain?: number }}
+   */
+  updateVoice(id, { frequency, gain }) {
+    const hasFrequency = typeof frequency === "number";
+    const hasGain = typeof gain === "number";
+
+    if (!hasFrequency && !hasGain) return;
+
+    const msg = {
+      type: "update",
+      id
+    };
+    if (hasFrequency) msg.frequency = frequency;
+    if (hasGain) msg.gain = gain;
+
+    this.node.port.postMessage(msg);
+  },
+  /**
+   * voice 削除
+   * 
+   * (フェードアウトは Worklet 側で自動)
+   * @param {number} id
+   */
+  removeVoice(id) {
+    this.node.port.postMessage({
+      type: "remove",
+      id
+    });
+  },
+  /** 一意のidを割り当て・取得 */
+  allocVoiceId: (() => {
+    let nextVoiceId = 0;
+    return () => nextVoiceId++;
+  })()
 }
 
 
@@ -58,43 +112,51 @@ addEventListener("pointerup", () => {
     audioCtx.resume();
   });
 }, { once: true });
-/** @type {{ [key: number]: { pos: [number, number], audio: AudioWorkletNode } }} */
+
+
+
+/**
+ * @type {{
+ *   [pointerId: number]: {
+ *     pos: [number, number],
+ *     voiceId: number
+ *   }
+ * }}
+ */
 const pointers = {};
-audioCtx.audioWorklet.addModule(audioWorklet.moduleURL).then(() => {
+audioWorklet.init().then(() => {
   addEventListener("pointerdown", e => {
-    if (e.button === 0) {
-      pointers[e.pointerId] = {
-        pos: pointerPos(e),
-        audio: audioWorklet.create()
-      };
-      setAudio(e, true);
-      pointers[e.pointerId].audio.connect(audioCtx.destination);
-      drawFg();
-    }
+    if (e.button !== 0) return;
+    const pos = pointerPos(e);
+    const voiceId = audioWorklet.allocVoiceId();
+    pointers[e.pointerId] = { pos, voiceId };
+    audioWorklet.addVoice(voiceId, {
+      frequency: calcFrequency(pos[1]),
+      gain: calcGain(pos[0])
+    });
+    drawFg();
   });
   addEventListener("pointermove", e => {
-    if (pointers[e.pointerId]) {
-      pointers[e.pointerId].pos = pointerPos(e);
-      setAudio(e);
-      drawFg();
-    }
+    const pointer = pointers[e.pointerId];
+    if (!pointer) return;
+    pointer.pos = pointerPos(e);
+    audioWorklet.updateVoice(pointer.voiceId, {
+      frequency: calcFrequency(pointer.pos[1]),
+      gain: calcGain(pointer.pos[0])
+    });
+    drawFg();
   });
   addEventListener("pointerup", pointerEnd);
   addEventListener("pointercancel", pointerEnd);
   /** @param {PointerEvent} e */
   function pointerEnd(e) {
-    if (e.button === 0) {
-      pointers[e.pointerId].audio.parameters.get("gain")
-        .cancelScheduledValues(audioCtx.currentTime)
-        .setValueAtTime(pointers[e.pointerId].audio.parameters.get("gain").value, audioCtx.currentTime)
-        .linearRampToValueAtTime(0, audioCtx.currentTime + fadeDuration)
-      ;
-      setTimeout(audio => {
-        audioWorklet.stop(audio);
-      }, fadeDuration * 2 * 1000, pointers[e.pointerId].audio);
-      delete pointers[e.pointerId];
-      drawFg();
-    }
+    // if (e.button !== 0) return;
+    const pointer = pointers[e.pointerId];
+    if (!pointer) return;
+
+    audioWorklet.removeVoice(pointer.voiceId);
+    delete pointers[e.pointerId]
+    drawFg();
   }
   /** @param {PointerEvent} e */
   function pointerPos(e) {
@@ -103,47 +165,22 @@ audioCtx.audioWorklet.addModule(audioWorklet.moduleURL).then(() => {
       e.y / visualViewport.height
     ];
   }
-  /** @param {PointerEvent} e */
-  function setAudio(e, isInit = false) {
-    const frequencyParam = pointers[e.pointerId].audio.parameters.get("frequency")
-    const gainParam = pointers[e.pointerId].audio.parameters.get("gain")
-    const newFrequency = STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * pointers[e.pointerId].pos[1]);
-
-    if (isInit) {
-      frequencyParam.value = newFrequency
-    } else {
-      frequencyParam
-        .cancelScheduledValues(audioCtx.currentTime)
-        .setValueAtTime(frequencyParam.value, audioCtx.currentTime)
-        .linearRampToValueAtTime(
-          newFrequency,
-          audioCtx.currentTime + fadeDuration
-        )
-      ;
-    }
-
-    gainParam
-      .cancelScheduledValues(audioCtx.currentTime)
-      .setValueAtTime(
-        gainParam.value,
-        audioCtx.currentTime
-      )
-      .linearRampToValueAtTime(
-        /*
-        0->0, 1->0.5, ∞->1
-        y = x / (1 + x)
-    
-        0->0, 1->1, ∞->2
-        y = 2x / (1 + x)
-    
-        y = 2x / (1 + x); x
-        x = y / (2 - y)
-          = 1 / ((2 / y) - 1)
-        */
-        1 / ((2 / pointers[e.pointerId].pos[0]) - 1) * 0.5,
-        audioCtx.currentTime + fadeDuration
-      )
-    ;
+  /**
+   * @param {number} normY
+   */
+  function calcFrequency(normY) {
+    // 0..1 -> LOWER_LIMIT..(LOWER_LIMIT+RANGE)
+    return STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * normY);
+  }
+  /**
+   * @param {number} normX
+   */
+  function calcGain(normX) {
+    // 元の式をそのまま使用
+    // 0->0, 1->0.5, ∞->1 のスケーリングの 0.5 倍
+    // y = 1 / ((2/x) - 1) * 0.5
+    if (normX <= 0) return 0;
+    return 1 / ((2 / normX) - 1) * 0.5;
   }
 });
 
@@ -219,4 +256,3 @@ function drawFg() {
 
 drawBg();
 // #endregion
-
