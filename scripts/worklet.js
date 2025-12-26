@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_HARMONICS = 8;
+const MAX_HARMONICS = 2;
 const STANDARD_PITCH = 440;
 
 /** 1フレーム当たりのfade割合 */
@@ -261,3 +261,4 @@ class HarmonicOsc extends AudioWorkletProcessor {
 }
 
 registerProcessor("harmonic-osc", HarmonicOsc);
+
