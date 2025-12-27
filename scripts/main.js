@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "f9a418fd-180f-47d2-b946-56f8c424135f"));
+setTimeout(() => alert("version:\n" + "6e4e3e64-af6b-4a99-9100-e34b4c030b64"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -8,8 +8,9 @@ const STANDARD_PITCH = 440;
 const SEMITONE = 2 ** (1 / 12);
 
 
-
+/** semitone 単位 */
 const LOWER_LIMIT = -21;
+/** semitone 単位 */
 const RANGE = 36;
 // const UPPER_LIMIT = LOWER_LIMIT * SEMITONE ** RANGE;
 
@@ -47,61 +48,61 @@ const audioWorklet = {
         }
       };
     }
-  },
-  /**
-   * voice 追加
-   * 
-   * (フェードインは Worklet 側で自動)
-   * @param {number} id
-   * @param {{ frequency: number, gain: number }}
-   */
-  addVoice(id, { frequency, gain }) {
-    this.node.port.postMessage({
-      type: "add",
-      id,
-      frequency,
-      gain
-    });
-  },
-  /**
-   * voice 更新
-   * 
-   * (frequency/gain どちらか片方だけでも可)
-   * @param {number} id
-   * @param {{ frequency?: number, gain?: number }}
-   */
-  updateVoice(id, { frequency, gain }) {
-    const hasFrequency = typeof frequency === "number";
-    const hasGain = typeof gain === "number";
+  }
+  // /**
+  //  * voice 追加
+  //  * 
+  //  * (フェードインは Worklet 側で自動)
+  //  * @param {number} id
+  //  * @param {{ frequency: number, gain: number }}
+  //  */
+  // addVoice(id, { frequency, gain }) {
+  //   this.node.port.postMessage({
+  //     type: "add",
+  //     id,
+  //     frequency,
+  //     gain
+  //   });
+  // },
+  // /**
+  //  * voice 更新
+  //  * 
+  //  * (frequency/gain どちらか片方だけでも可)
+  //  * @param {number} id
+  //  * @param {{ frequency?: number, gain?: number }}
+  //  */
+  // updateVoice(id, { frequency, gain }) {
+  //   const hasFrequency = typeof frequency === "number";
+  //   const hasGain = typeof gain === "number";
 
-    if (!hasFrequency && !hasGain) return;
+  //   if (!hasFrequency && !hasGain) return;
 
-    const msg = {
-      type: "update",
-      id
-    };
-    if (hasFrequency) msg.frequency = frequency;
-    if (hasGain) msg.gain = gain;
+  //   const msg = {
+  //     type: "update",
+  //     id
+  //   };
+  //   if (hasFrequency) msg.frequency = frequency;
+  //   if (hasGain) msg.gain = gain;
 
-    this.node.port.postMessage(msg);
-  },
-  /**
-   * voice 削除
-   * 
-   * (フェードアウトは Worklet 側で自動)
-   * @param {number} id
-   */
-  removeVoice(id) {
-    this.node.port.postMessage({
-      type: "remove",
-      id
-    });
-  },
-  /** 一意のidを割り当て・取得 */
-  allocVoiceId: (() => {
-    let nextVoiceId = 0;
-    return () => nextVoiceId++;
-  })()
+  //   this.node.port.postMessage(msg);
+  // },
+  // /**
+  //  * voice 削除
+  //  * 
+  //  * (フェードアウトは Worklet 側で自動)
+  //  * @param {number} id
+  //  */
+  // removeVoice(id) {
+  //   this.node.port.postMessage({
+  //     type: "remove",
+  //     id
+  //   });
+  // },
+  // /** 一意のidを割り当て・取得 */
+  // allocVoiceId: (() => {
+  //   let nextVoiceId = 0;
+  //   return () => nextVoiceId++;
+  // })()
 }
 
 
@@ -160,7 +161,7 @@ audioWorklet.init().then(() => {
       const pointer = pointers[e.pointerId];
       if (!pointer) return;
       if (pointer.event === POINTER_EVENT.start) {
-        pointer.event = POINTER_EVENT.none;
+        delete pointers[e.pointerId];
       } else {
         pointer.event = POINTER_EVENT.end;
       }
