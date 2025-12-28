@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "6e4e3e64-af6b-4a99-9100-e34b4c030b64"));
+setTimeout(() => alert("version:\n" + "611538cc-8cb9-4743-aea7-bb79982a15b8"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
@@ -36,7 +36,8 @@ const audioWorklet = {
       await audioCtx.audioWorklet.addModule("scripts/worklet.js");
       this.node = new AudioWorkletNode(audioCtx, "harmonic-osc", {
         processorOptions: {
-          lowerLimit: LOWER_LIMIT
+          lowerLimit: LOWER_LIMIT,
+          range: RANGE
         }
       });
       this.node.connect(audioCtx.destination);
@@ -169,51 +170,51 @@ audioWorklet.init().then(() => {
     }
   }
   requestAnimationFrame(function frameRequestCallback() {
-    /**
-     * @type {{
-     *   [voiceId: number]: {
-     *     type: number,
-     *     frequency: number,
-     *     gain: number
-     *   }
-     * }}
-     */
-    const msg = {};
+    // /**
+    //  * @type {{
+    //  *   [voiceId: number]: {
+    //  *     type: number,
+    //  *     frequency: number,
+    //  *     gain: number
+    //  *   }
+    //  * }}
+    //  */
+    const msg = [];
     let hasMsg = false;
     for (const pointerId in pointers) {
       const pointer = pointers[pointerId];
       if (!pointer) continue;
+      let type, pitch, gain;
       switch (pointer.event) {
         case POINTER_EVENT.none:
           continue;
-        case POINTER_EVENT.start:
-          msg[pointer.fixedId] = {
-            type: 0,
-            frequency: calcFrequency(pointer.pos[1]),
-            gain: calcGain(pointer.pos[0])
-          };
+        case POINTER_EVENT.start: {
+          type = 0;
           break;
+        }
         case POINTER_EVENT.move:
-          msg[pointer.fixedId] = {
-            type: 1,
-            frequency: calcFrequency(pointer.pos[1]),
-            gain: calcGain(pointer.pos[0])
-          };
+          type = 1
           break;
         case POINTER_EVENT.end:
-          msg[pointer.fixedId] = {
-            type: 2,
-            frequency: 0,
-            gain: 0
-          };
+          type = 2;
+          gain = 0;
           delete pointers[pointerId];
           break;
       }
+      const id = pointer.fixedId & 0x3ff;
+      type = type & 0x3;
+      pitch ??= calcPitch(pointer.pos[1]);
+      gain ??= calcGain(pointer.pos[0]);
+      msg.push(
+        (id & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
+        pitch >>> 4 & 0xffff,
+        (pitch & 0xf) << 12 | gain
+      )
       pointer.event = POINTER_EVENT.none;
       hasMsg = true;
     }
     if (hasMsg) {
-      audioWorklet.node.port.postMessage(msg);
+      audioWorklet.node.port.postMessage(new Uint16Array(msg));
       drawFg();
     }
 
@@ -229,19 +230,20 @@ audioWorklet.init().then(() => {
   /**
    * @param {number} normY
    */
-  function calcFrequency(normY) {
-    // 0..1 -> LOWER_LIMIT..(LOWER_LIMIT+RANGE)
-    return STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * normY);
+  function calcPitch(normY) {
+    // // 0..1 -> LOWER_LIMIT..(LOWER_LIMIT+RANGE)
+    // return STANDARD_PITCH * SEMITONE ** (LOWER_LIMIT + RANGE * normY);
+    return (normY * 0xffffff + 0.5) & 0xffffff;
   }
   /**
    * @param {number} normX
    */
   function calcGain(normX) {
-    // 元の式をそのまま使用
-    // 0->0, 1->0.5, ∞->1 のスケーリングの 0.5 倍
-    // y = 1 / ((2/x) - 1) * 0.5
-    if (normX <= 0) return 0;
-    return 1 / ((2 / normX) - 1) * 0.5;
+    // // 0->0, 1->0.5, ∞->1 のスケーリングの 0.5 倍
+    // // y = 1 / ((2/x) - 1) * 0.5
+    // if (normX <= 0) return 0;
+    // return 1 / ((2 / normX) - 1) * 0.5;
+    return (normX * 0xfff + 0.5) & 0xfff;
   }
 });
 
