@@ -24,6 +24,10 @@ const nyquist = sampleRate / 2;
 class HarmonicOsc extends AudioWorkletProcessor {
   constructor(options) {
     super();
+    /** Hz */
+    // this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
+    this.lowerLimit = options.processorOptions.lowerLimit;
+    this.range = options.processorOptions.range;
 
     this.phase = new Float32Array(INIT_VOICES_SIZE * MAX_HARMONICS);
     this.freePhaseSlots = [];
@@ -141,31 +145,89 @@ class HarmonicOsc extends AudioWorkletProcessor {
       return voice;
     };
 
-    /** Hz */
-    this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
+    // /**
+    //  * @param {{
+    //  *   data: {
+    //  *     [id: number]: {
+    //  *       type: number,
+    //  *       frequency: number,
+    //  *       gain: number
+    //  *     }
+    //  *   }
+    //  * }} e
+    //  */
+    // this.port.onmessage = e => {
+    //   for (const [id, { type, frequency, gain }] of Object.entries(e.data)) {
+    //     const index = this.voiceMap.get(id);
+    //     if (index !== undefined) {
+    //       const entry = this.voices[index];
+    //       if (entry && entry.voice.stopped) {
+    //         throw new Error(
+    //           "停止が命令された voice に、変更が加えられようとしています。"
+    //         );
+    //       }
+    //     }
+    //     switch (type) {
+    //       case 0: { // add
+    //         let index;
+    //         if (this.freeVoiceSlots.length > 0) {
+    //           index = this.freeVoiceSlots.pop();
+    //         } else {
+    //           index = this.voices.length;
+    //         }
+    //         this.voices[index] = { id, voice: acquireVoice(frequency, gain) };
+    //         this.voiceMap.set(id, index);
+    //         break;
+    //       }
+    //       case 1: { // update
+    //         const index = this.voiceMap.get(id);
+    //         if (index === undefined) break;
 
-    /**
-     * @param {{
-     *   data: {
-     *     [id: number]: {
-     *       type: number,
-     *       frequency: number,
-     *       gain: number
-     *     }
-     *   }
-     * }} e
-     */
+    //         const voice = this.voices[index].voice;
+    //         voice.targetFrequency = frequency;
+    //         voice.targetGain = gain;
+    //         break;
+    //       }
+    //       case 2: { //remove
+    //         const index = this.voiceMap.get(id);
+    //         if (index === undefined) break;
+
+    //         const voice = this.voices[index].voice;
+    //         voice.targetGain = 0;
+    //         voice.stopped = true;
+    //         break;
+    //       }
+    //     }
+    //   }
+    // };
     this.port.onmessage = e => {
-      for (const [id, { type, frequency, gain }] of Object.entries(e.data)) {
-        const index = this.voiceMap.get(id);
-        if (index !== undefined) {
-          const entry = this.voices[index];
-          if (entry && entry.voice.stopped) {
-            throw new Error(
-              "停止が命令された voice に、変更が加えられようとしています。"
-            );
-          }
-        }
+      const buf = e.data;
+      if (!(buf instanceof Uint16Array)) throw new Error("データ型が無効です。");
+
+      // stride = 3
+      const N = buf.length;
+      for (let i = 0; i < N; i += 3) {
+        const w0 = buf[i];
+        const w1 = buf[i + 1];
+        const w2 = buf[i + 2];
+
+        const id    = w0 >>> 6;
+        const type  = (w0 >>> 4) & 0x3;
+        const frequency = STANDARD_PITCH * (2 ** ((
+          // semitone
+          this.lowerLimit + (
+            // 0-1
+            (
+              // ビットデータ
+              ((w0 & 0xF) << 20) | (w1 << 4) | (w2 >>> 12)
+            ) / 0xffffff
+          ) * this.range
+        ) / 12));
+        const gain  = (w2 & 0xfff) / 0xfff;
+
+        // -----------------------------
+        // 5. type に応じて voice を更新
+        // -----------------------------
         switch (type) {
           case 0: { // add
             let index;
@@ -198,7 +260,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
           }
         }
       }
-    }
+    };
   }
 
   process(inputs, outputs, parameters) {
