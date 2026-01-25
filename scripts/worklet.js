@@ -27,6 +27,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
     /** Hz */
     // this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
     this.lowerLimit = options.processorOptions.lowerLimit;
+    this.baseFrequency = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
     this.range = options.processorOptions.range;
 
     this.phase = new Float32Array(INIT_VOICES_SIZE * MAX_HARMONICS);
@@ -87,17 +88,6 @@ class HarmonicOsc extends AudioWorkletProcessor {
      */
     this.voiceMap = new Map();
     /**
-     * voiceId と Voice 実体を紐付けるための参照テーブル。
-     *
-     * [id, Voice][] の entries 形式
-     *
-     * このテーブルは「参照の解決」を担当し、実体のライフサイクル管理は行わない。
-     * 
-     * 実体の保持・再利用は voicePool が担当する。
-     * @type {{ id: number, voice: Voice }[]}
-     */
-    this.voices = [];
-    /**
      * Voice 実体を保持するためのプール。
      *
      * - 生成済みの Voice インスタンスを格納する
@@ -115,10 +105,8 @@ class HarmonicOsc extends AudioWorkletProcessor {
       }
       return voices;
     })();
-    /**
-     * @type {number[]}
-     */
-    this.freeVoiceSlots = [];
+    /** @type {{ id: number, voice: Voice }[]} */
+    this.activeVoices = [];
     /**
      * @param {number} frequency
      * @param {number} gain
@@ -230,21 +218,17 @@ class HarmonicOsc extends AudioWorkletProcessor {
         // -----------------------------
         switch (type) {
           case 0: { // add
-            let index;
-            if (this.freeVoiceSlots.length > 0) {
-              index = this.freeVoiceSlots.pop();
-            } else {
-              index = this.voices.length;
-            }
-            this.voices[index] = { id, voice: acquireVoice(frequency, gain) };
-            this.voiceMap.set(id, index);
+            this.voiceMap.set(
+              id,
+              this.activeVoices.push({ id, voice: acquireVoice(frequency, gain) }) - 1
+            );
             break;
           }
           case 1: { // update
             const index = this.voiceMap.get(id);
             if (index === undefined) break;
 
-            const voice = this.voices[index].voice;
+            const voice = this.activeVoices[index].voice;
             voice.targetFrequency = frequency;
             voice.targetGain = gain;
             break;
@@ -253,7 +237,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
             const index = this.voiceMap.get(id);
             if (index === undefined) break;
 
-            const voice = this.voices[index].voice;
+            const voice = this.activeVoices[index].voice;
             voice.targetGain = 0;
             voice.stopped = true;
             break;
@@ -266,22 +250,21 @@ class HarmonicOsc extends AudioWorkletProcessor {
   process(inputs, outputs, parameters) {
     const out = outputs[0][0];
 
+    const freePhaseSlots = this.freePhaseSlots;
     const voiceMap = this.voiceMap;
-    const voices = this.voices;
     const freeVoices = this.freeVoices;
-    const freeVoiceSlots = this.freeVoiceSlots
+    const activeVoices = this.activeVoices;
     const phase = this.phase;
-    const lower = this.lowerLimit;
+    const baseFrequency = this.baseFrequency;
 
     const ol = out.length;
-    const vl = voices.length;
+    const vl = activeVoices.length;
     for (let i = 0; i < ol; ++i) {
       let sample = 0;
 
       for (let j = 0; j < vl; ++j) {
-        const entry = voices[j];
-        if (entry === null) continue;
-        const voice = entry.voice;      
+        const entry = activeVoices[j];
+        const voice = entry.voice;
         let f0 = voice.frequency;
         let g0 = voice.gain;
 
@@ -327,7 +310,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         let freqN = f0;
         let pos = base; // base + k 現在の参照位置
         for (let k = 0; k < maxH; ++k, ++pos, freqN += f0) {
-          const amp = baseAmp[k] * (lower / freqN);
+          const amp = baseAmp[k] * (baseFrequency / freqN);
           let p = phase[pos];
 
           /*
@@ -374,14 +357,20 @@ class HarmonicOsc extends AudioWorkletProcessor {
     }
 
     for (let j = vl - 1; j >= 0; --j) {
-      const entry = voices[j];
-      if (entry === null) continue;
+      const entry = activeVoices[j];
+      const id = entry.id;
       const voice = entry.voice;
       if (voice.stopped && voice.gain === 0) {
+        freePhaseSlots.push(voice.phaseIndex);
         freeVoices.push(voice);
-        voices[j] = null;
-        freeVoiceSlots.push(j);
-        voiceMap.delete(entry.id);
+        voiceMap.delete(id);
+
+        const lastVoice = activeVoices[activeVoices.length - 1];
+        if (voice !== lastVoice) {
+          activeVoices[j] = lastVoice;
+          voiceMap.set(lastVoice.id, j);
+        }
+        activeVoices.pop();
         continue;
       }
     }
