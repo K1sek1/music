@@ -27,43 +27,46 @@ class HarmonicOsc extends AudioWorkletProcessor {
     /** Hz */
     // this.lowerLimit = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
     this.lowerLimit = options.processorOptions.lowerLimit;
-    this.baseFrequency = STANDARD_PITCH * (2 ** (options.processorOptions.lowerLimit / 12));
+    this.baseFreq = STANDARD_PITCH * (2 ** (this.lowerLimit / 12));
     this.range = options.processorOptions.range;
 
     this.phase = new Float32Array(INIT_VOICES_SIZE * MAX_HARMONICS);
-    this.freePhaseSlots = [];
-    this.nextPhaseIndex = 0;
-    const allocatePhaseSlot = () => {
-      if (this.freePhaseSlots.length > 0) {
-        return this.freePhaseSlots.pop();
-      }
-    
-      if (this.nextPhaseIndex + MAX_HARMONICS > this.phase.length) {
-        const newPhase = new Float32Array(this.phase.length * 2);
-        newPhase.set(this.phase);
-        this.phase = newPhase;
-      }
-    
-      const phaseIndex = this.nextPhaseIndex;
+    const allocatePhaseSlot = (() => {
+      let nextPhaseIndex = 0;
+      return (() => {
+        if (nextPhaseIndex + MAX_HARMONICS > this.phase.length) {
+          const newPhase = new Float32Array(this.phase.length * 2);
+          newPhase.set(this.phase);
+          this.phase = newPhase;
+        }
 
-      // phase をゼロクリア
-      const phase = this.phase;
-      const end = phaseIndex + MAX_HARMONICS;
-      for (let i = phaseIndex; i < end; i++) {
-        phase[i] = 0;
-      }
+        const phaseIndex = nextPhaseIndex;
 
-      this.nextPhaseIndex += MAX_HARMONICS;
-      return phaseIndex;
-    }
+        // phase をゼロクリア
+        const phase = this.phase;
+        const end = phaseIndex + MAX_HARMONICS;
+        for (let i = phaseIndex; i < end; i++) {
+          phase[i] = 0;
+        }
+
+        nextPhaseIndex += MAX_HARMONICS;
+        return phaseIndex;
+      });
+    })();
     /**
      * @typedef {Object} Voice
-     * @property {number} frequency
-     * @property {number} gain
-     * @property {number} targetFrequency
-     * @property {number} targetGain
+     * @property {number} semitone
+     * @property {number} loudness
+     * @property {number} targetSemitone readonly
+     * @property {number} targetLoudness readonly
+     * @property {number} velocitySemitone readonly
+     * @property {number} velocityLoudness readonly
      * @property {number} phaseIndex 位相配列 (固定長)
      * @property {boolean} stopped
+     * @property {number || undefined} freq
+     * @property {number || undefined} gain
+     * @property {(value: number) => void} setTargetSemitone
+     * @property {(value: number) => void} setTargetLoudness
      */
     /**
      * Voice の状態オブジェクトを生成するファクトリ関数。
@@ -74,14 +77,39 @@ class HarmonicOsc extends AudioWorkletProcessor {
      * @returns {Voice}
      */
     function Voice() {
-      return {
-        frequency: 0,
-        gain: 0,
-        targetFrequency: 0,
-        targetGain: 0,
+      let targetSemitone = 0;
+      let targetLoudness = 0;
+      let velocitySemitone = 0;
+      let velocityLoudness = 0;
+      const voice = {
+        semitone: 0,
+        loudness: 0,
+        targetSemitone: 0,
+        targetLoudness: 0,
+        velocitySemitone: 0,
+        velocityLoudness: 0,
         phaseIndex: allocatePhaseSlot(),
-        stopped: false
+        stopped: false,
+        freq: undefined,
+        gain: undefined,
+        setTargetSemitone(value) {
+          if (
+            targetSemitone !== voice.targetSemitone ||
+            velocitySemitone !== voice.velocitySemitone
+          ) throw new Error("値が外部から変更されています。");
+          voice.targetSemitone = targetSemitone = value;
+          voice.velocitySemitone = velocitySemitone = (value - voice.semitone) * fadeRatio;
+        },
+        setTargetLoudness(value) {
+          if (
+            targetLoudness !== voice.targetLoudness ||
+            velocityLoudness !== voice.velocityLoudness
+          ) throw new Error("値が外部から変更されています。");
+          voice.targetLoudness = targetLoudness = value;
+          voice.velocityLoudness = velocityLoudness = (value - voice.loudness) * fadeRatio;
+        }
       };
+      return voice;
     }
     /**
      * id -> index
@@ -108,86 +136,32 @@ class HarmonicOsc extends AudioWorkletProcessor {
     /** @type {{ id: number, voice: Voice }[]} */
     this.activeVoices = [];
     /**
-     * @param {number} frequency
-     * @param {number} gain
+     * @param {number} semitone
+     * @param {number} loudness
      */
-    const acquireVoice = (frequency, gain) => {
-      let voice = this.freeVoices.pop();
-      if (voice !== undefined) {
-        voice.targetFrequency = frequency;
-        voice.targetGain = gain;
-        voice.stopped = false;
+    const acquireVoice = (semitone, loudness) => {
+      let voice = this.freeVoices.pop() ?? Voice();
 
-        // phase をゼロクリア
+      voice.semitone = semitone;
+      voice.loudness = 0;
+      voice.setTargetSemitone(semitone);
+      voice.setTargetLoudness(loudness);
+      voice.stopped = false;
+      voice.freq = undefined;
+      voice.gain = undefined;
+
+      /* phase をゼロクリア */ {
         const base = voice.phaseIndex;
         const phase = this.phase;
         const end = base + MAX_HARMONICS;
         for (let i = base; i < end; i++) {
           phase[i] = 0;
         }
-      } else {
-        voice = Voice();
       }
-      voice.frequency = frequency;
-      voice.gain = 0;
+
       return voice;
     };
 
-    // /**
-    //  * @param {{
-    //  *   data: {
-    //  *     [id: number]: {
-    //  *       type: number,
-    //  *       frequency: number,
-    //  *       gain: number
-    //  *     }
-    //  *   }
-    //  * }} e
-    //  */
-    // this.port.onmessage = e => {
-    //   for (const [id, { type, frequency, gain }] of Object.entries(e.data)) {
-    //     const index = this.voiceMap.get(id);
-    //     if (index !== undefined) {
-    //       const entry = this.voices[index];
-    //       if (entry && entry.voice.stopped) {
-    //         throw new Error(
-    //           "停止が命令された voice に、変更が加えられようとしています。"
-    //         );
-    //       }
-    //     }
-    //     switch (type) {
-    //       case 0: { // add
-    //         let index;
-    //         if (this.freeVoiceSlots.length > 0) {
-    //           index = this.freeVoiceSlots.pop();
-    //         } else {
-    //           index = this.voices.length;
-    //         }
-    //         this.voices[index] = { id, voice: acquireVoice(frequency, gain) };
-    //         this.voiceMap.set(id, index);
-    //         break;
-    //       }
-    //       case 1: { // update
-    //         const index = this.voiceMap.get(id);
-    //         if (index === undefined) break;
-
-    //         const voice = this.voices[index].voice;
-    //         voice.targetFrequency = frequency;
-    //         voice.targetGain = gain;
-    //         break;
-    //       }
-    //       case 2: { //remove
-    //         const index = this.voiceMap.get(id);
-    //         if (index === undefined) break;
-
-    //         const voice = this.voices[index].voice;
-    //         voice.targetGain = 0;
-    //         voice.stopped = true;
-    //         break;
-    //       }
-    //     }
-    //   }
-    // };
     this.port.onmessage = e => {
       const buf = e.data;
       if (!(buf instanceof Uint16Array)) throw new Error("データ型が無効です。");
@@ -201,26 +175,19 @@ class HarmonicOsc extends AudioWorkletProcessor {
 
         const id    = w0 >>> 6;
         const type  = (w0 >>> 4) & 0x3;
-        const frequency = STANDARD_PITCH * (2 ** ((
-          // semitone
-          this.lowerLimit + (
-            // 0-1
-            (
-              // ビットデータ
-              ((w0 & 0xF) << 20) | (w1 << 4) | (w2 >>> 12)
-            ) / 0xffffff
-          ) * this.range
-        ) / 12));
-        const gain  = (w2 & 0xfff) / 0xfff;
+        const semitone = this.lowerLimit + (
+          (((w0 & 0xF) << 20) | (w1 << 4) | (w2 >>> 12)) / 0xffffff
+        ) * this.range;
+        const loudness = (w2 & 0xfff) / 0xfff;
 
         // -----------------------------
-        // 5. type に応じて voice を更新
+        // type に応じて voice を更新
         // -----------------------------
         switch (type) {
           case 0: { // add
             this.voiceMap.set(
               id,
-              this.activeVoices.push({ id, voice: acquireVoice(frequency, gain) }) - 1
+              this.activeVoices.push({ id, voice: acquireVoice(semitone, loudness) }) - 1
             );
             break;
           }
@@ -229,8 +196,8 @@ class HarmonicOsc extends AudioWorkletProcessor {
             if (index === undefined) break;
 
             const voice = this.activeVoices[index].voice;
-            voice.targetFrequency = frequency;
-            voice.targetGain = gain;
+            voice.setTargetSemitone(semitone);
+            voice.setTargetLoudness(loudness);
             break;
           }
           case 2: { //remove
@@ -238,7 +205,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
             if (index === undefined) break;
 
             const voice = this.activeVoices[index].voice;
-            voice.targetGain = 0;
+            voice.setTargetLoudness(0);
             voice.stopped = true;
             break;
           }
@@ -250,12 +217,9 @@ class HarmonicOsc extends AudioWorkletProcessor {
   process(inputs, outputs, parameters) {
     const out = outputs[0][0];
 
-    const freePhaseSlots = this.freePhaseSlots;
-    const voiceMap = this.voiceMap;
-    const freeVoices = this.freeVoices;
     const activeVoices = this.activeVoices;
     const phase = this.phase;
-    const baseFrequency = this.baseFrequency;
+    const baseFreq = this.baseFreq;
 
     const ol = out.length;
     const vl = activeVoices.length;
@@ -265,39 +229,35 @@ class HarmonicOsc extends AudioWorkletProcessor {
       for (let j = 0; j < vl; ++j) {
         const entry = activeVoices[j];
         const voice = entry.voice;
-        let f0 = voice.frequency;
-        let g0 = voice.gain;
 
-        // ---- frequency / gain の線形スムージング ----
+        // ---- freq / gain の線形スムージング ----
         // target まで fade して追いつく想定（target が動いても毎サンプル再計算）
-        /* frequency */ {
-          const tf = voice.targetFrequency;
-          const df = tf - f0;
-          const step = df * fadeRatio;
-          f0 = df * df <= step * step ? tf : (f0 + step);
-          voice.frequency = f0;
-          // if (df !== 0) {
-          //   const step = df * fadeRatio;
-          //   // 数値誤差で振動しないように閾値でスナップ
-          //   f0 =
-          //     df * df <= step * step
-          //       ? tf
-          //       : f0 + step
-          //   ;
-          //   voice.frequency = f0;
-          // }
+
+        /* freq */ 
+        let f0 = voice.freq;
+        {
+          let semitone = voice.semitone;
+          const target = voice.targetSemitone;
+          if (f0 === undefined || semitone !== target) {
+            const step = voice.velocitySemitone;
+            const next = semitone + step;
+            voice.semitone = semitone = step > 0 && next >= target || step < 0 && next <= target ? target : next;
+
+            f0 = voice.freq = STANDARD_PITCH * (2 ** (semitone / 12));
+          }
         }
-        /* gain */ {
-          const tg = voice.targetGain
-          const dg = tg - g0;
-          if (dg !== 0) {
-            const step = dg * fadeRatio;
-            if (dg * dg <= step * step) {
-              g0 = tg;
-            } else {
-              g0 += step;
-            }
-            voice.gain = g0;
+
+        /* gain */ 
+        let gain = voice.gain;
+        {
+          let loudness = voice.loudness;
+          const target = voice.targetLoudness;
+          if (gain === undefined || loudness !== target) {
+            const step = voice.velocityLoudness;
+            const next = loudness + step;
+            voice.loudness = loudness = step > 0 && next >= target || step < 0 && next <= target ? target : next;
+
+            gain = voice.gain = 1 / (2 / loudness - 1) * 0.5;
           }
         }
 
@@ -310,7 +270,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
         let freqN = f0;
         let pos = base; // base + k 現在の参照位置
         for (let k = 0; k < maxH; ++k, ++pos, freqN += f0) {
-          const amp = baseAmp[k] * (baseFrequency / freqN);
+          const amp = baseAmp[k] * (baseFreq / freqN);
           let p = phase[pos];
 
           /*
@@ -350,28 +310,31 @@ class HarmonicOsc extends AudioWorkletProcessor {
           phase[pos] = p;
         }
 
-        sample += voiceSample * g0;
+        sample += voiceSample * gain;
       }
 
       out[i] = sample;
     }
 
-    for (let j = vl - 1; j >= 0; --j) {
-      const entry = activeVoices[j];
-      const id = entry.id;
-      const voice = entry.voice;
-      if (voice.stopped && voice.gain === 0) {
-        freePhaseSlots.push(voice.phaseIndex);
-        freeVoices.push(voice);
-        voiceMap.delete(id);
+    {
+      const voiceMap = this.voiceMap;
+      const freeVoices = this.freeVoices;
+      for (let j = vl - 1; j >= 0; --j) {
+        const entry = activeVoices[j];
+        const id = entry.id;
+        const voice = entry.voice;
+        if (voice.stopped && voice.loudness === 0) {
+          freeVoices.push(voice);
+          voiceMap.delete(id);
 
-        const lastVoice = activeVoices[activeVoices.length - 1];
-        if (voice !== lastVoice) {
-          activeVoices[j] = lastVoice;
-          voiceMap.set(lastVoice.id, j);
+          const lastVoice = activeVoices[activeVoices.length - 1];
+          if (entry !== lastVoice) {
+            activeVoices[j] = lastVoice;
+            voiceMap.set(lastVoice.id, j);
+          }
+          activeVoices.pop();
+          continue;
         }
-        activeVoices.pop();
-        continue;
       }
     }
 
