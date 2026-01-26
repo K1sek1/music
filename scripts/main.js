@@ -201,25 +201,36 @@ audioWorklet.init().then(() => {
           delete pointers[pointerId];
           break;
       }
-      const id0 = (pointer.fixedId << 1 | 0) & 0x3ff;
+
+      const id = pointer.fixedId & 0x3ff;
       type = type & 0x3;
-      pitch = calcPitch(pointer.pos[1] * 127 / 128);
-      gain ??= calcGain(pointer.pos[0]) / 2;
+      pitch ??= calcPitch(pointer.pos[1]);
+      gain ??= calcGain(pointer.pos[0]);
       msg.push(
-        (id0 & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
+        (id & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
         pitch >>> 4 & 0xffff,
         (pitch & 0xf) << 12 | gain
       )
-      const id1 = (pointer.fixedId << 1 | 1) & 0x3ff;
-      type = type & 0x3;
-      pitch = calcPitch(pointer.pos[1] * 127 / 128 + 1 / 128);
-      gain ??= calcGain(pointer.pos[0]) / 2;
-      msg.push(
-        (id1 & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
-        pitch >>> 4 & 0xffff,
-        (pitch & 0xf) << 12 | gain
-      )
+      // const id0 = (pointer.fixedId << 1 | 0) & 0x3ff;
+      // type = type & 0x3;
+      // pitch = calcPitch(pointer.pos[1] * 127 / 128);
+      // gain ??= calcGain(pointer.pos[0]) / 2;
+      // msg.push(
+      //   (id0 & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
+      //   pitch >>> 4 & 0xffff,
+      //   (pitch & 0xf) << 12 | gain
+      // )
+      // const id1 = (pointer.fixedId << 1 | 1) & 0x3ff;
+      // type = type & 0x3;
+      // pitch = calcPitch(pointer.pos[1] * 127 / 128 + 1 / 128);
+      // gain ??= calcGain(pointer.pos[0]) / 2;
+      // msg.push(
+      //   (id1 & 0x3ff) << 6 | (type & 0x3) << 4 | pitch >>> 20 & 0xf,
+      //   pitch >>> 4 & 0xffff,
+      //   (pitch & 0xf) << 12 | gain
+      // )
       // console.log(msg.map(val => val.toString(16).padStart(4, "0")));
+
       pointer.event = POINTER_EVENT.none;
       hasMsg = true;
     }
