@@ -21,6 +21,13 @@ for (let n = 1; n <= MAX_HARMONICS; ++n) {
 const dt = 1 / sampleRate;
 const nyquist = sampleRate / 2;
 
+const tanA0 = Math.PI / 4;
+const tanA1 = -(Math.PI ** 3 / 384);
+const tanA2 = Math.PI ** 5 / 122880;
+const tanB1 = -(Math.PI ** 2 / 32);
+const tanB2 = Math.PI ** 4 / 6144;
+const tanC  = (1 + tanB1 + tanB2) / (tanA0 + tanA1 + tanA2);
+
 class HarmonicOsc extends AudioWorkletProcessor {
   constructor(options) {
     super();
@@ -268,11 +275,25 @@ class HarmonicOsc extends AudioWorkletProcessor {
             // h = 0.7751560075753159 + x2 * h;     // a0
             // gain = voice.gain = x3 * h * 0.5;
 
-            let h = 0.04999511718749978;
-            h = 0.1999999949336052 + x2 * h;
-            h = 0.7874999898567331 + x2 * h;
-            h = -0.006237469904698252 + x2 * h;
-            gain = voice.gain = loudness * h * 0.5;
+            // let h = 0.04999511718749978;
+            // h = 0.1999999949336052 + x2 * h;
+            // h = 0.7874999898567331 + x2 * h;
+            // h = -0.006237469904698252 + x2 * h;
+            // gain = voice.gain = loudness * h * 0.5;
+
+            // let h = 0.006781116;
+            // h = 0.0548311355616071 + x2 * h;
+            // h = 0.2732395447351627 + x2 * h;
+            // h = 0.7853981633974483 + x2 * h;
+            // gain = voice.gain = loudness * h * 0.5;
+
+            // const k = 4 / Math.PI;
+            // gain = voice.gain = loudness / (k + (1 - k) * loudness) * 0.5;
+
+            gain = voice.gain
+              = tanC * loudness * (tanA0 + x2 * (tanA1 + x2 * tanA2)) / (1 + x2 * (tanB1 + x2 * tanB2))
+              * 0.5
+            ;
           }
         }
 
@@ -356,6 +377,5 @@ class HarmonicOsc extends AudioWorkletProcessor {
     return true;
   }
 }
-
 
 registerProcessor("harmonic-osc", HarmonicOsc);
