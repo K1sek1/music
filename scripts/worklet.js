@@ -272,7 +272,7 @@ class HarmonicOsc extends AudioWorkletProcessor {
             h = 0.1999999949336052 + x2 * h;
             h = 0.7874999898567331 + x2 * h;
             h = -0.006237469904698252 + x2 * h;
-            gain = voice.gain = x * h * 0.5;
+            gain = voice.gain = loudness * h * 0.5;
           }
         }
 
@@ -356,5 +356,6 @@ class HarmonicOsc extends AudioWorkletProcessor {
     return true;
   }
 }
+
 
 registerProcessor("harmonic-osc", HarmonicOsc);
