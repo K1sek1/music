@@ -257,7 +257,22 @@ class HarmonicOsc extends AudioWorkletProcessor {
             const next = loudness + step;
             voice.loudness = loudness = step > 0 && next >= target || step < 0 && next <= target ? target : next;
 
-            gain = voice.gain = 1 / (2 / loudness - 1) * 0.5;
+            // gain = voice.gain = 1 / (2 / loudness - 1) * 0.5;
+
+            const x2 = loudness * loudness;
+
+            // const x3 = x2 * loudness;
+            // let h = 0.0059417208181036605;        // a3
+            // h = 0.049999928953109174 + x2 * h;   // a2
+            // h = 0.19999977264356106 + x2 * h;    // a1
+            // h = 0.7751560075753159 + x2 * h;     // a0
+            // gain = voice.gain = x3 * h * 0.5;
+
+            let h = 0.04999511718749978;
+            h = 0.1999999949336052 + x2 * h;
+            h = 0.7874999898567331 + x2 * h;
+            h = -0.006237469904698252 + x2 * h;
+            gain = voice.gain = x * h * 0.5;
           }
         }
 

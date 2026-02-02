@@ -1,6 +1,6 @@
 "use strict";
 
-setTimeout(() => alert("version:\n" + "7.0"));
+setTimeout(() => alert("version:\n" + "7.1"));
 
 /** Hz */
 const STANDARD_PITCH = 440;
